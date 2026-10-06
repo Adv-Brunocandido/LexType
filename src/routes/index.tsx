@@ -120,9 +120,14 @@ function Index() {
       const start = startedAt ?? Date.now();
       if (!startedAt) setStartedAt(start);
 
+      // Aceita a letra base para caracteres acentuados (ex: "a" vale para "ã"),
+      // para não penalizar quem usa teclado sem layout ABNT.
+      const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const correct = e.key === expected || strip(e.key) === strip(expected);
+
       let newErrors = errors;
       let newMap = errorMap;
-      if (e.key !== expected) {
+      if (!correct) {
         newErrors = errors + 1;
         const exp = expected.toLowerCase();
         newMap = { ...errorMap, [exp]: (errorMap[exp] ?? 0) + 1 };
