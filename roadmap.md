@@ -8,3 +8,11 @@
 - [x] Sistema de motivação: maestria por tecla, streak, resumo de sessão, parecer técnico
 - [x] Persistência em localStorage
 - [x] Head metadata da rota /
+
+## Atualização 1
+- [x] Teclado ABNT2 completo (seleção e visual), números/acentos/pontuação
+- [x] Sons: digitação, erro, vitória, combo
+- [x] Recursos TDAH: combo, XP/patentes, meta diária, confete, modo foco
+- [x] Modo automático adaptativo + Prof. Dr. Rigoroso
+- [x] Input para celular
+- [ ] Modo Estudos Mistos Avançados (área do Direito, semântica da palavra + "virada de chave" gerada por IA)
