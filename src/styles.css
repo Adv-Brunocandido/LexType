@@ -145,3 +145,28 @@
 @utility animate-pop-in {
   animation: pop-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+@utility animate-shake {
+  animation: shake 0.18s ease-in-out;
+}
+
+@keyframes combo-pop {
+  0% { transform: scale(1.5); }
+  100% { transform: scale(1); }
+}
+@utility animate-combo {
+  animation: combo-pop 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0.2; }
+}
+@utility animate-confetti {
+  animation: confetti-fall 2.6s ease-in forwards;
+}
