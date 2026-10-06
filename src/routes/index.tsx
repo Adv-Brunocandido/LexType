@@ -116,7 +116,7 @@ function Index() {
     (e: React.KeyboardEvent) => {
       if (result || e.key.length !== 1) return;
       e.preventDefault();
-      const expected = text[pos];
+      const expected = text[pos]!;
       const start = startedAt ?? Date.now();
       if (!startedAt) setStartedAt(start);
 

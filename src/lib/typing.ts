@@ -11,7 +11,7 @@ export type Mode = "aquecimento" | "palavras" | "frases";
 const VOWELS = "aeiou";
 
 function rand<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(Math.random() * arr.length)] as T;
 }
 
 export function generateText(mode: Mode, keys: string[]): string {
@@ -86,7 +86,7 @@ export function weakestKeys(stats: KeyStats, keys: string[], n = 3): string[] {
 export function coachingTip(weak: string[]): string {
   if (weak.length === 0)
     return "Mantenha os dedos ancorados na fileira central (asdf / jklç) e deixe apenas o dedo responsável se mover — o pulso fica estático.";
-  const k = weak[0];
+  const k = weak[0]!;
   const sup = KEY_ROWS.superior.includes(k);
   const inf = KEY_ROWS.inferior.includes(k);
   if (sup)
