@@ -38,30 +38,30 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.16 0.015 260);
-  --foreground: oklch(0.93 0.01 250);
-  --card: oklch(0.2 0.018 260);
-  --card-foreground: oklch(0.93 0.01 250);
-  --popover: oklch(0.2 0.018 260);
-  --popover-foreground: oklch(0.93 0.01 250);
-  --primary: oklch(0.78 0.13 85);
-  --primary-foreground: oklch(0.18 0.02 260);
-  --secondary: oklch(0.24 0.02 260);
-  --secondary-foreground: oklch(0.85 0.01 250);
-  --muted: oklch(0.24 0.02 260);
-  --muted-foreground: oklch(0.62 0.02 255);
-  --accent: oklch(0.28 0.025 260);
-  --accent-foreground: oklch(0.93 0.01 250);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.97 0.01 250);
-  --border: oklch(0.3 0.02 260);
-  --input: oklch(0.3 0.02 260);
-  --ring: oklch(0.78 0.13 85);
-  --gold: oklch(0.78 0.13 85);
-  --gold-foreground: oklch(0.18 0.02 260);
-  --keycap: oklch(0.26 0.02 260);
-  --keycap-foreground: oklch(0.85 0.01 250);
-  --success: oklch(0.72 0.17 155);
+  --background: oklch(0.975 0.006 85);
+  --foreground: oklch(0.22 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 260);
+  --primary: oklch(0.6 0.13 75);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.94 0.008 85);
+  --secondary-foreground: oklch(0.3 0.02 260);
+  --muted: oklch(0.94 0.008 85);
+  --muted-foreground: oklch(0.48 0.02 255);
+  --accent: oklch(0.92 0.01 85);
+  --accent-foreground: oklch(0.22 0.02 260);
+  --destructive: oklch(0.55 0.21 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.87 0.01 85);
+  --input: oklch(0.87 0.01 85);
+  --ring: oklch(0.6 0.13 75);
+  --gold: oklch(0.6 0.13 75);
+  --gold-foreground: oklch(0.99 0 0);
+  --keycap: oklch(0.96 0.006 85);
+  --keycap-foreground: oklch(0.3 0.02 260);
+  --success: oklch(0.55 0.15 155);
 }
 
 .dark {
@@ -113,7 +113,7 @@
 
 @utility keycap-shadow {
   box-shadow:
-    0 2px 0 oklch(0.12 0.01 260),
+    0 2px 0 color-mix(in oklab, var(--foreground) 35%, transparent),
     inset 0 1px 0 oklch(1 0 0 / 6%);
 }
 
