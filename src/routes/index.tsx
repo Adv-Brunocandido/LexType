@@ -55,10 +55,15 @@ const MODES: { id: FullMode; label: string; hint: string }[] = [
   { id: "frases", label: "Frases", hint: "Frases jurídicas completas" },
 ];
 
+// Matérias do Exame da OAB (1ª fase).
 const AREAS = [
-  "Processo Civil", "Direito Civil", "Direito Penal", "Processo Penal", "Constitucional",
-  "Administrativo", "Tributário", "Trabalho", "Empresarial", "Consumidor",
+  "Ética Profissional (Estatuto da OAB)", "Filosofia do Direito", "Direitos Humanos", "Direito Constitucional",
+  "Direito Eleitoral", "Direito Internacional", "Direito Financeiro", "Direito Tributário",
+  "Direito Administrativo", "Direito Ambiental", "Direito Civil", "Estatuto da Criança e do Adolescente",
+  "Direito do Consumidor", "Direito Empresarial", "Direito Processual Civil", "Direito Penal",
+  "Direito Processual Penal", "Direito Previdenciário", "Direito do Trabalho", "Direito Processual do Trabalho",
 ];
+const CUSTOM = "__custom__";
 
 const FALLBACK_STUDY: StudyItem[] = [
   {
@@ -111,6 +116,13 @@ function Index() {
   const [selectedKeys, setSelectedKeys] = useState<string[]>(KEY_GROUPS.Central!);
   const [mode, setMode] = useState<FullMode>("automatico");
   const [area, setArea] = useState(AREAS[0]!);
+  const [customArea, setCustomArea] = useState("");
+  const [lineCount, setLineCount] = useState(2);
+  const [reference, setReference] = useState<{ name: string; text: string } | null>(null);
+  const [repeat, setRepeat] = useState(false);
+  const [pinned, setPinned] = useState<StudyItem | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const eng = useRef<Engine>(newEngine(""));
   const [, setTick] = useState(0);
   const rerender = () => setTick((t) => t + 1);
@@ -135,9 +147,11 @@ function Index() {
   const [studyError, setStudyError] = useState<string | null>(null);
   const seenTerms = useRef<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const goNextRef = useRef<() => void>(() => {});
   const composing = useRef(false);
   const consumed = useRef(0);
   const fetchStudy = useServerFn(generateStudy);
+  const effectiveArea = area === CUSTOM ? customArea.trim() || "Direito em geral" : area;
 
   const say = useCallback((mood: Mood, vars?: { k?: string; n?: number }) => {
     setQuote((q) => ({ text: professorSays(mood, vars), mood, id: q.id + 1 }));
@@ -169,7 +183,9 @@ function Index() {
       setStudyError(null);
       loadText("");
       try {
-        const r = await fetchStudy({ data: { area: ar, keys, seen: seenTerms.current.slice(-20) } });
+        const r = await fetchStudy({
+          data: { area: ar, keys, seen: seenTerms.current.slice(-20), count: lineCount, reference: reference?.text },
+        });
         const items = r.itens.length ? r.itens : FALLBACK_STUDY;
         if (r.error) setStudyError(`${r.error} Usando conteúdo offline.`);
         items.forEach((i) => seenTerms.current.push(i.termo));
@@ -185,14 +201,14 @@ function Index() {
         setStudyLoading(false);
       }
     },
-    [fetchStudy, loadText],
+    [fetchStudy, loadText, lineCount, reference],
   );
 
   const reset = useCallback(
     (m: FullMode, keys: string[], stats: KeyStats, lvl: number, opts?: { area?: string; freshStudy?: boolean }) => {
       if (m === "estudos") {
         const q = opts?.freshStudy ? [] : studyQueue;
-        void nextStudy(q, keys, opts?.area ?? area);
+        void nextStudy(q, keys, opts?.area ?? effectiveArea);
         return;
       }
       setCurrentStudy(null);
@@ -205,7 +221,7 @@ function Index() {
         loadText(generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl }));
       }
     },
-    [area, loadText, nextStudy, studyQueue],
+    [effectiveArea, loadText, nextStudy, studyQueue],
   );
 
   // Carrega progresso e gera o primeiro texto somente no navegador (evita divergência de hidratação).
@@ -221,6 +237,7 @@ function Index() {
     const m = localStorage.getItem("lextype-muted") === "1";
     setMuted(m);
     soundSettings.enabled = !m;
+    setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
     reset("automatico", KEY_GROUPS.Central!, st, lvl);
     say("start");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -275,6 +292,7 @@ function Index() {
     setToday(sessionsToday());
     setBestWpm((b) => Math.max(b, wpm));
 
+    if (currentStudy) setPinned(currentStudy);
     setResult({ wpm, accuracy, errors: e.errors, maxCombo: e.maxCombo, xp: gained, levelChange, study: currentStudy ?? undefined });
     playWin();
     if (levelChange > 0) say("levelUp");
@@ -358,7 +376,7 @@ function Index() {
       if (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
       if (ev.key === "Enter" && result) {
         ev.preventDefault();
-        reset(mode, selectedKeys, keyStats, level);
+        goNextRef.current();
         return;
       }
       if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) inputRef.current?.focus();
@@ -366,6 +384,23 @@ function Index() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [keyStats, level, mode, reset, result, selectedKeys]);
+
+  const applyTheme = (t: "dark" | "light") => {
+    setTheme(t);
+    document.documentElement.classList.toggle("dark", t === "dark");
+    localStorage.setItem("lextype-theme", t);
+  };
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!/\.(txt|md|csv|json|html?)$/i.test(file.name) && !file.type.startsWith("text/")) {
+      setStudyError("Envie um arquivo de texto (.txt ou .md).");
+      return;
+    }
+    const text = (await file.text()).slice(0, 30000);
+    setReference({ name: file.name, text });
+    setStudyError(null);
+  };
 
   const applyKeys = (keys: string[]) => {
     setSelectedKeys(keys);
@@ -387,6 +422,9 @@ function Index() {
     soundSettings.enabled = !m;
     localStorage.setItem("lextype-muted", m ? "1" : "0");
   };
+
+  const goNext = () => (repeat && eng.current.text ? loadText(eng.current.text) : reset(mode, selectedKeys, keyStats, level));
+  goNextRef.current = goNext;
 
   const e = eng.current;
   const pos = e.pos;
@@ -432,16 +470,41 @@ function Index() {
             <Stat value={`${streak}🔥`} label="dias" gold />
             <Stat value={bestWpm} label="melhor PPM" />
             <button
-              onClick={toggleMute}
-              className="rounded-md border border-border px-2 py-1 text-base"
-              aria-label={muted ? "Ativar som" : "Silenciar"}
-              title={muted ? "Ativar som" : "Silenciar"}
+              onClick={() => setShowSettings((v) => !v)}
+              className={cn("rounded-md border px-2 py-1 text-base", showSettings ? "border-gold" : "border-border")}
+              aria-label="Configurações"
+              title="Configurações"
             >
-              {muted ? "🔇" : "🔊"}
+              ⚙️
             </button>
           </div>
         </div>
       </header>
+
+      {showSettings && (
+        <div className="animate-pop-in border-b border-border bg-card">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-6 px-4 py-3 text-sm sm:px-6">
+            <span className="font-semibold uppercase tracking-wider text-muted-foreground">Configurações</span>
+            <div className="flex items-center gap-2">
+              Tema:
+              <div className="flex overflow-hidden rounded-md border border-border">
+                {(["dark", "light"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => applyTheme(t)}
+                    className={cn("px-3 py-1", theme === t ? "bg-gold text-gold-foreground" : "hover:bg-secondary")}
+                  >
+                    {t === "dark" ? "🌙 Escuro" : "☀️ Claro"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button onClick={toggleMute} className="rounded-md border border-border px-3 py-1 hover:bg-secondary">
+              {muted ? "🔇 Som desligado" : "🔊 Som ligado"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {/* Modos */}
@@ -500,24 +563,56 @@ function Index() {
           </div>
         )}
         {mode === "estudos" && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
-            <label htmlFor="area" className="font-medium">Área do Direito:</label>
-            <select
-              id="area"
-              value={area}
-              onChange={(ev) => {
-                setArea(ev.target.value);
-                setStudyQueue([]);
-                void nextStudy([], selectedKeys, ev.target.value);
-              }}
-              className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
-            >
-              {AREAS.map((a) => (
-                <option key={a}>{a}</option>
-              ))}
-            </select>
-            <span className="text-xs text-muted-foreground">Termine a linha para receber a semântica do termo e uma virada de chave.</span>
-            {studyError && <span className="text-xs text-destructive">{studyError}</span>}
+          <div className="space-y-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <label htmlFor="area" className="font-medium">Matéria (OAB):</label>
+              <select
+                id="area"
+                value={area}
+                onChange={(ev) => setArea(ev.target.value)}
+                className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+              >
+                {AREAS.map((a) => (
+                  <option key={a}>{a}</option>
+                ))}
+                <option value={CUSTOM}>Outra matéria…</option>
+              </select>
+              {area === CUSTOM && (
+                <input
+                  value={customArea}
+                  onChange={(ev) => setCustomArea(ev.target.value.slice(0, 120))}
+                  placeholder="Ex.: recursos no STJ, LGPD, contratos bancários…"
+                  className="min-w-64 flex-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+                />
+              )}
+              <label htmlFor="lines" className="font-medium">Linhas:</label>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setLineCount((n) => Math.max(2, n - 1))} className="h-7 w-7 rounded-md border border-border bg-card" aria-label="Menos linhas">−</button>
+                <span id="lines" className="w-6 text-center font-mono-type font-bold text-gold">{lineCount}</span>
+                <button onClick={() => setLineCount((n) => Math.min(10, n + 1))} className="h-7 w-7 rounded-md border border-border bg-card" aria-label="Mais linhas">+</button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="cursor-pointer rounded-md border border-dashed border-gold/50 bg-card px-3 py-1.5 text-xs hover:border-gold">
+                📎 {reference ? `Referência: ${reference.name}` : "Enviar arquivo de referência (.txt, .md)"}
+                <input type="file" accept=".txt,.md,.csv,.json,.html,text/*" className="hidden" onChange={(ev) => void onFile(ev.target.files?.[0])} />
+              </label>
+              {reference && (
+                <button onClick={() => setReference(null)} className="text-xs text-muted-foreground hover:text-destructive">remover</button>
+              )}
+              <button
+                onClick={() => {
+                  setStudyQueue([]);
+                  void nextStudy([], selectedKeys, effectiveArea);
+                }}
+                disabled={studyLoading}
+                className="rounded-md bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground disabled:opacity-50"
+              >
+                {studyLoading ? "Gerando…" : "Gerar nova aula"}
+              </button>
+              {studyQueue.length > 0 && <span className="text-xs text-muted-foreground">{studyQueue.length} linha(s) restante(s)</span>}
+              {studyError && <span className="text-xs text-destructive">{studyError}</span>}
+            </div>
           </div>
         )}
 
@@ -532,7 +627,8 @@ function Index() {
             <ResultView
               result={result}
               weak={weak}
-              onNext={() => reset(mode, selectedKeys, keyStats, level)}
+              repeat={repeat}
+              onNext={goNext}
             />
           ) : (
             <>
@@ -550,7 +646,7 @@ function Index() {
                 </span>
               </div>
               {studyLoading ? (
-                <p className="py-6 text-center text-muted-foreground">O professor está preparando a aula de {area}…</p>
+                <p className="py-6 text-center text-muted-foreground">O professor está preparando a aula de {effectiveArea}…</p>
               ) : (
                 <p className="font-mono-type text-xl leading-relaxed tracking-wide sm:text-2xl">
                   {e.text.split("").map((ch, i) => (
@@ -591,6 +687,27 @@ function Index() {
             </>
           )}
         </section>
+
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => setRepeat((r) => !r)}
+            aria-pressed={repeat}
+            title="Repetir a mesma frase até você desligar"
+            className={cn(
+              "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+              repeat ? "border-gold bg-gold text-gold-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground",
+            )}
+          >
+            🔁 Repetir frase {repeat ? "ligado" : "desligado"}
+          </button>
+          {!result && e.text && (
+            <button onClick={() => loadText(e.text)} className="rounded-full border border-border bg-card px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground">
+              ↺ Recomeçar esta
+            </button>
+          )}
+        </div>
+
+        {pinned && <LessonCard item={pinned} onClose={() => setPinned(null)} />}
 
         {/* Teclado */}
         <section className="rounded-xl border border-border bg-card p-4 sm:p-6">
@@ -653,7 +770,28 @@ function Legend({ cls, label }: { cls: string; label: string }) {
   );
 }
 
-function ResultView({ result, weak, onNext }: { result: SessionResult; weak: string[]; onNext: () => void }) {
+function LessonCard({ item, onClose }: { item: StudyItem; onClose: () => void }) {
+  return (
+    <div className="animate-pop-in relative space-y-4 rounded-xl border border-gold/40 bg-gold/5 p-5">
+      <button onClick={onClose} className="absolute right-3 top-3 rounded-md px-2 text-muted-foreground hover:text-foreground" aria-label="Fechar aula">
+        ✕
+      </button>
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-gold">Semântica</div>
+        <p className="mt-1 pr-6 text-sm">
+          <span className="font-mono-type font-bold">{item.termo}</span> — {item.semantica}
+        </p>
+      </div>
+      <div className="border-t border-gold/20 pt-4">
+        <div className="text-xs font-semibold uppercase tracking-wider text-gold">Virada de chave · {item.virada.titulo}</div>
+        <p className="mt-2 text-sm"><span className="font-semibold">Raciocínio: </span>{item.virada.raciocinio}</p>
+        <p className="mt-2 text-sm text-muted-foreground"><span className="font-semibold text-foreground">Exemplo: </span>{item.virada.exemplo}</p>
+      </div>
+    </div>
+  );
+}
+
+function ResultView({ result, weak, onNext, repeat }: { result: SessionResult; weak: string[]; onNext: () => void; repeat: boolean }) {
   return (
     <div className="animate-pop-in space-y-6 text-center">
       <div className="flex flex-wrap justify-center gap-8 sm:gap-10">
@@ -667,22 +805,6 @@ function ResultView({ result, weak, onNext }: { result: SessionResult; weak: str
         <p className={cn("text-sm font-semibold", result.levelChange > 0 ? "text-success" : "text-destructive")}>
           {result.levelChange > 0 ? "▲ Subiu de nível — a próxima rota será mais pesada" : "▼ Nível reduzido — de volta ao básico"}
         </p>
-      )}
-
-      {result.study && (
-        <div className="mx-auto max-w-2xl space-y-4 rounded-xl border border-gold/40 bg-gold/5 p-5 text-left">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gold">Semântica</div>
-            <p className="mt-1 text-sm">
-              <span className="font-mono-type font-bold">{result.study.termo}</span> — {result.study.semantica}
-            </p>
-          </div>
-          <div className="border-t border-gold/20 pt-4">
-            <div className="text-xs font-semibold uppercase tracking-wider text-gold">Virada de chave · {result.study.virada.titulo}</div>
-            <p className="mt-2 text-sm"><span className="font-semibold">Raciocínio: </span>{result.study.virada.raciocinio}</p>
-            <p className="mt-2 text-sm text-muted-foreground"><span className="font-semibold text-foreground">Exemplo: </span>{result.study.virada.exemplo}</p>
-          </div>
-        </div>
       )}
 
       {!result.study && (
@@ -701,7 +823,7 @@ function ResultView({ result, weak, onNext }: { result: SessionResult; weak: str
         onClick={onNext}
         className="rounded-lg bg-gold px-6 py-2.5 text-sm font-semibold text-gold-foreground transition-transform hover:scale-105"
       >
-        Próxima sessão <span className="opacity-60">(Enter)</span>
+        {repeat ? "🔁 Repetir frase" : "Próxima sessão"} <span className="opacity-60">(Enter)</span>
       </button>
     </div>
   );

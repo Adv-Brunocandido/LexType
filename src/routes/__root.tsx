@@ -106,8 +106,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "try{if(localStorage.getItem('lextype-theme')==='light')document.documentElement.classList.remove('dark')}catch(e){}",
+          }}
+        />
         <HeadContent />
       </head>
       <body>

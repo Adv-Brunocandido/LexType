@@ -16,3 +16,9 @@
 - [x] Modo automático adaptativo + Prof. Dr. Rigoroso
 - [x] Input para celular
 - [ ] Modo Estudos Mistos Avançados (área do Direito, semântica da palavra + "virada de chave" gerada por IA)
+- [ ] Estudos: matérias da OAB + campo de matéria livre
+- [ ] Estudos: escolher quantidade de linhas (2 até 10)
+- [ ] Configurações: tema claro/escuro
+- [ ] Virada de chave só fecha quando o usuário quiser
+- [ ] Botão repetir (ficar na mesma frase)
+- [ ] Enviar arquivo de texto/diretriz como referência para a IA

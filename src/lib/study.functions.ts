@@ -41,7 +41,15 @@ const schema = {
 
 export const generateStudy = createServerFn({ method: "POST" })
   .inputValidator((d) =>
-    z.object({ area: z.string().min(2).max(60), keys: z.array(z.string().max(2)).max(60), seen: z.array(z.string().max(80)).max(30) }).parse(d),
+    z
+      .object({
+        area: z.string().min(2).max(120),
+        keys: z.array(z.string().max(2)).max(60),
+        seen: z.array(z.string().max(120)).max(30),
+        count: z.number().int().min(2).max(10),
+        reference: z.string().max(30000).optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data }): Promise<{ itens: StudyItem[]; error?: string }> => {
     const apiKey = process.env["LOVABLE_API_KEY"];
@@ -51,7 +59,8 @@ export const generateStudy = createServerFn({ method: "POST" })
 Teclas que o aluno está treinando: ${data.keys.join(" ") || "todas"}.
 Termos já estudados (não repita): ${data.seen.join(", ") || "nenhum"}.
 
-Gere 3 itens. Cada item:
+${data.reference ? `MATERIAL DE REFERÊNCIA DO ALUNO (baseie o conteúdo nele, priorizando seus temas e diretrizes):\n"""\n${data.reference}\n"""\n` : ""}
+Gere exatamente ${data.count} itens. Cada item:
 - linha: frase jurídica em português, minúsculas, 40 a 90 caracteres, sem aspas nem travessões, usando preferencialmente palavras ricas nas teclas treinadas, contendo o termo.
 - termo: o termo técnico central da linha.
 - semantica: significado técnico-jurídico preciso do termo e sua etimologia quando útil (máx. 2 frases).
@@ -110,7 +119,7 @@ Seja rigorosamente correto quanto à legislação brasileira vigente. Responda e
     }
     try {
       const parsed = JSON.parse(out) as { itens: StudyItem[] };
-      return { itens: parsed.itens.slice(0, 3) };
+      return { itens: parsed.itens.slice(0, data.count) };
     } catch {
       return { itens: [], error: "Resposta da IA inválida." };
     }
