@@ -2,6 +2,31 @@ import type { StudyItem } from "./study.functions";
 
 export type OfflineBankEntry = StudyItem & { area: string };
 
+export function normalizeArea(name: string): string {
+  const n = (name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (n.includes("etica") || n.includes("estatuto da oab")) return "ética";
+  if (n.includes("filosofia")) return "filosofia";
+  if (n.includes("humano")) return "direitos humanos";
+  if (n.includes("constituc")) return "constitucional";
+  if (n.includes("eleitor")) return "eleitoral";
+  if (n.includes("internac")) return "internacional";
+  if (n.includes("financ")) return "financeiro";
+  if (n.includes("tribut")) return "tributário";
+  if (n.includes("admin")) return "administrativo";
+  if (n.includes("ambien")) return "ambiental";
+  if (n.includes("crianca") || n.includes("adolescente") || n.includes("eca")) return "eca";
+  if (n.includes("consum")) return "consumidor";
+  if (n.includes("empres")) return "empresarial";
+  if (n.includes("previd")) return "previdenciário";
+  if (n.includes("trabalho") && (n.includes("process") || n.includes("rito"))) return "processo do trabalho";
+  if (n.includes("trabalho")) return "trabalho";
+  if (n.includes("process") && n.includes("penal")) return "processo penal";
+  if (n.includes("penal")) return "penal";
+  if (n.includes("process") && n.includes("civil")) return "processo civil";
+  if (n.includes("civil")) return "civil";
+  return n;
+}
+
 // Mega-Banco Offline Consolidado de 2206 Viradas de Chave para a 1ª Fase da OAB (FGV)
 // Extraído de mais de 20 provas oficiais da FGV OAB + Prática da Advocacia e Magistratura.
 // Mínimo garantido de 100 viradas de chave para cada uma das 20 disciplinas da OAB.
@@ -24275,12 +24300,10 @@ export const BANK: OfflineBankEntry[] = [
 ];
 
 export function offlineStudy(area: string, count: number, seen: string[]): StudyItem[] {
-  const a = (area || "").toLowerCase();
-  const matches = BANK.filter(
-    (b) => a.includes(b.area.toLowerCase()) || b.area.toLowerCase().split(" ").every((w) => a.includes(w)),
-  );
+  const targetArea = normalizeArea(area);
+  const matches = BANK.filter((b) => b.area.toLowerCase() === targetArea);
   const basePool = matches.length
-    ? [...matches, ...BANK.filter((b) => !matches.includes(b))]
+    ? [...matches, ...BANK.filter((b) => b.area.toLowerCase() !== targetArea)]
     : [...BANK].sort(() => Math.random() - 0.5);
 
   const pool: StudyItem[] = basePool.map((b) => ({
