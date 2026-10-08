@@ -525,7 +525,7 @@ function Index() {
 
   const applyTheme = (t: ThemeMode) => {
     setTheme(t);
-    document.documentElement.classList.remove("dark", "light", "sepia", "oled");
+    document.documentElement.classList.remove("dark", "light", "sepia", "oled", "aquarela");
     document.documentElement.classList.add(t);
     localStorage.setItem("lextype-theme", t);
   };

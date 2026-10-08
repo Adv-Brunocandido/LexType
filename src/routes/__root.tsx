@@ -115,7 +115,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('lextype-theme')||'dark';document.documentElement.classList.remove('dark','light','sepia','oled');document.documentElement.classList.add(t)}catch(e){}",
+              "try{var t=localStorage.getItem('lextype-theme')||'dark';document.documentElement.classList.remove('dark','light','sepia','oled','aquarela');document.documentElement.classList.add(t)}catch(e){}",
           }}
         />
         <HeadContent />
