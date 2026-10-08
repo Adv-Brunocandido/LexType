@@ -53,7 +53,7 @@ import {
   pendingErrors,
 } from "@/lib/engine";
 
-export type ThemeMode = "dark" | "light" | "sepia" | "oled";
+export type ThemeMode = "dark" | "light" | "sepia" | "oled" | "aquarela";
 export type PanelLayout = "stack" | "split" | "keyboard-top";
 
 export const Route = createFileRoute("/")({
@@ -310,7 +310,7 @@ function Index() {
 
     const savedTheme = (localStorage.getItem("lextype-theme") as ThemeMode) || "dark";
     setTheme(savedTheme);
-    document.documentElement.classList.remove("dark", "light", "sepia", "oled");
+    document.documentElement.classList.remove("dark", "light", "sepia", "oled", "aquarela");
     document.documentElement.classList.add(savedTheme);
 
     const savedScale = (localStorage.getItem("lextype-scale") as KeyboardScale) || "normal";
@@ -798,6 +798,7 @@ function Index() {
                     { id: "light", label: "☀️ Claro" },
                     { id: "sepia", label: "📜 Sépia" },
                     { id: "oled", label: "⬛ OLED" },
+                    { id: "aquarela", label: "🎨 Aquarela" },
                   ] as const
                 ).map((t) => (
                   <button
