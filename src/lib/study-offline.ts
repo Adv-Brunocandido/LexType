@@ -1,7 +1,7 @@
 import type { StudyItem } from "./study.functions";
 
-// Mega-banco offline: viradas de chave práticas de alta incidência nas provas da OAB (FGV)
-// Usado quando a IA está indisponível (sem créditos, offline).
+// Mega-Banco Offline Consolidado: Viradas de chave de alta densidade e acerto na 1ª fase da OAB (FGV).
+// Cobre as 20 matérias com foco em súmulas do STF/STJ, temas repetitivos e letra da lei.
 export const BANK: { area: string; item: StudyItem }[] = [
   {
     area: "ética",
@@ -117,16 +117,30 @@ export const BANK: { area: string; item: StudyItem }[] = [
   },
   {
     area: "ética",
-    linha: "o estagiário só pode praticar atos judiciais em conjunto com advogado",
-    termo: "atos de estagiário",
+    linha: "o cancelamento da inscrição extingue o registro e exige novo exame",
+    termo: "cancelamento x licenciamento",
     semantica:
-      "Atuação permitida ao estudante de Direito inscrito na OAB sob supervisão profissional (art. 3º, §2º do EAOAB).",
+      "Cessação definitiva ou temporária do exercício da advocacia (arts. 11 e 12 do EAOAB).",
     virada: {
-      titulo: "Atos isolados de estagiário",
+      titulo: "Novo exame no cancelamento",
       raciocinio:
-        "O estagiário só pode atuar isoladamente para retirar autos em cartório e obter certidões. Petições, audiências e recursos exigem assinatura conjunta do advogado.",
+        "O licenciamento é temporário (ex: doença, cargo transitório incompatível). O cancelamento é definitivo: caso o ex-advogado queira retornar por ter sido expulso ou sofrer exclusão, deve requerer reabilitação.",
       exemplo:
-        "Estagiário comparece sozinho à audiência de instrução e subscreve termo sem advogado: o ato é nulo e o estagiário comete exercício ilegal da profissão.",
+        "Advogado toma posse em cargo efetivo de juiz: sua inscrição na OAB é cancelada, e não apenas licenciada.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "o sigilo profissional do advogado é direito e dever de ordem pública",
+    termo: "sigilo profissional",
+    semantica:
+      "Dever ético de confidencialidade sobre fatos confiados pelo cliente (art. 7º, XIX do EAOAB e arts. 35 a 38 do CED).",
+    virada: {
+      titulo: "Inviolabilidade e depoimento como testemunha",
+      raciocinio:
+        "O advogado tem o dever de recusar-se a depor como testemunha sobre fatos de que teve conhecimento no exercício da profissão, mesmo que autorizado pelo constituinte.",
+      exemplo:
+        "Juiz intima advogado para depor sobre confissão sigilosa de cliente em ação penal: o advogado tem o dever ético legal de manter silêncio.",
     },
   },
   {
@@ -214,16 +228,30 @@ export const BANK: { area: string; item: StudyItem }[] = [
   },
   {
     area: "constitucional",
-    linha: "os tratados de direitos humanos aprovados em dois turnos têm força de emenda",
-    termo: "status dos tratados",
+    linha: "os legitimados especiais na ação direta devem provar pertinência temática",
+    termo: "pertinência temática",
     semantica:
-      "Equiparação dos tratados internacionais sobre direitos humanos às emendas à Constituição (art. 5º, §3º da CF).",
+      "Exigência de vínculo direto entre o objeto da norma impugnada e os interesses corporativos do autor (art. 103 da CF).",
     virada: {
-      titulo: "Tratados de direitos humanos",
+      titulo: "Legitimados universais vs especiais",
       raciocinio:
-        "Se aprovados por 3/5 dos votos em 2 turnos nas duas Casas, equivalem a Emenda Constitucional. Se aprovados pelo rito ordinário, têm status supralegal (RE 466.343).",
+        "Governador de Estado, Mesa de Assembleia Legislativa e confederação sindical/entidade de classe nacional são legitimados especiais e devem provar pertinência temática no STF.",
       exemplo:
-        "Pacto de San José da Costa Rica aprovado pelo rito comum revoga eficácia de leis ordinárias infraconstitucionais contrárias, como a prisão do depositário infiel (SV 25).",
+        "Governador do RJ ajuíza ADI contra lei que regulamenta tributo municipal no Acre: ação extinta sem resolução de mérito por falta de pertinência temática.",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "a medida cautelar concedida em ação direta opera efeitos prospectivos",
+    termo: "cautelar em adi",
+    semantica:
+      "Regime de eficácia temporal das decisões liminares em controle abstrato (art. 11, §1º da Lei 9.868/99).",
+    virada: {
+      titulo: "Eficácia ex nunc da cautelar",
+      raciocinio:
+        "A liminar em ADI opera efeitos ex nunc (para frente) e restaura a eficácia das leis anteriores que haviam sido revogadas (efeito repristinatório), salvo decisão expressa em contrário.",
+      exemplo:
+        "STF concede liminar contra lei estadual que aumentou ICMS: a cobrança fica suspensa a partir da publicação da liminar, não gerando devolução retroativa imediata.",
     },
   },
   {
@@ -297,6 +325,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "processual civil",
+    linha: "a ação rescisória não suspende a execução da sentença rescindenda",
+    termo: "ação rescisória",
+    semantica:
+      "Ação autônoma de impugnação para desconstituir decisão com trânsito em julgado (arts. 966 e 969 do CPC).",
+    virada: {
+      titulo: "Ausência de efeito suspensivo automático",
+      raciocinio:
+        "A propositura de ação rescisória não suspende a eficácia da decisão rescindenda, salvo concessão expressa de tutela provisória de urgência pelo relator.",
+      exemplo:
+        "Executado requer que o juiz de 1º grau suspenda o leilão porque ajuizou ação rescisória no tribunal: pedido é indeferido, pois o ajuizamento não obsta o cumprimento.",
+    },
+  },
+  {
     area: "civil",
     linha: "a desconsideração da personalidade jurídica no código civil adota a teoria maior",
     termo: "teoria maior",
@@ -364,6 +406,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
         "Ações condenatórias estão sujeitas à prescrição (atinge a pretensão). Ações constitutivas sujeitam-se à decadência. Ações puramente declaratórias são perpétuas/imprescritíveis.",
       exemplo:
         "Ação anulatória de negócio jurídico por erro ou coação é constitutiva: sujeita-se a prazo decadencial de 4 anos (art. 178 do CC), que não se interrompe.",
+    },
+  },
+  {
+    area: "civil",
+    linha: "o cônjuge concorre com descendentes conforme o regime de bens do casamento",
+    termo: "sucessão do cônjuge",
+    semantica:
+      "Ordem de vocação hereditária do cônjuge sobrevivente (art. 1.829, I do Código Civil).",
+    virada: {
+      titulo: "Art. 1.829, I do CC",
+      raciocinio:
+        "O cônjuge sobrevivente concorre com os descendentes na comunhão parcial apenas sobre os bens particulares do falecido. Não concorre se for comunhão universal ou separação obrigatória.",
+      exemplo:
+        "Marido falece deixando bens adquiridos antes do casamento sob comunhão parcial: a viúva é herdeira concorrente com os filhos sobre esses bens particulares.",
     },
   },
   {
@@ -492,6 +548,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "processual penal",
+    linha: "a nulidade no processo penal exige demonstração de efetivo prejuízo",
+    termo: "pas de nullité sans grief",
+    semantica:
+      "Princípio do prejuízo processual estipulado no art. 563 do Código de Processo Penal.",
+    virada: {
+      titulo: "Art. 563 do CPP",
+      raciocinio:
+        "Nenhum ato será declarado nulo se da nulidade não tiver resultado prejuízo para a acusação ou para a defesa (mesmo em nulidades absolutas o STF exige demonstração de prejuízo).",
+      exemplo:
+        "Inversão na ordem de inquirição de testemunha sem que haja qualquer prejuízo prático à defesa não anula a instrução processual.",
+    },
+  },
+  {
     area: "trabalho",
     linha: "a prescrição trabalhista impõe limite bienal e marco quinquenal do ajuizamento",
     termo: "prescrição bienal e quinquenal",
@@ -547,6 +617,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "trabalho",
+    linha: "o intervalo intrajornada suprimido gera pagamento apenas do período faltante",
+    termo: "intervalo intrajornada",
+    semantica:
+      "Regime indenizatório do descanso para refeição após a Reforma Trabalhista (art. 71, §4º da CLT).",
+    virada: {
+      titulo: "Natureza indenizatória e proporcional",
+      raciocinio:
+        "A não concessão ou concessão parcial do intervalo mínimo implica o pagamento, de natureza indenizatória, apenas do período suprimido, com acréscimo de 50%, sem reflexos em outras verbas.",
+      exemplo:
+        "Empregado usufruiu 40 minutos de 1 hora de intervalo: recebe indenização de apenas 20 minutos com 50%, e não da hora cheia com reflexos.",
+    },
+  },
+  {
     area: "processual do trabalho",
     linha: "o depósito recursal é inexigível de beneficiário da justiça gratuita",
     termo: "isenção de depósito",
@@ -587,6 +671,19 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "processual do trabalho",
+    linha: "a revelia do empregador não impede a produção de provas pelo advogado presente",
+    termo: "revelia com patrono",
+    semantica: "Garantia do contraditório prevista no art. 844, §5º da CLT.",
+    virada: {
+      titulo: "Art. 844, §5º da CLT",
+      raciocinio:
+        "Ainda que ausente o reclamado, presente o advogado na audiência, serão aceitas a contestação e os documentos eventualmente apresentados, podendo o causídico produzir provas.",
+      exemplo:
+        "Preposto atrasa no trânsito, mas advogado da ré está na sala de audiência com defesa anexada: o juiz é obrigado a receber a contestação e os documentos.",
+    },
+  },
+  {
     area: "tributário",
     linha: "a entrega da declaração do contribuinte constitui o crédito tributário",
     termo: "súmula 436 stj",
@@ -624,6 +721,19 @@ export const BANK: { area: string; item: StudyItem }[] = [
         "Presume-se dissolvida irregularmente a empresa que deixa de funcionar no seu domicílio fiscal sem comunicação aos órgãos competentes, legitimando o redirecionamento ao sócio-gerente.",
       exemplo:
         "Oficial de justiça constata que a empresa fechou as portas e sumiu: a Fazenda tem direito automático de penhorar bens pessoais do administrador da época do fechamento.",
+    },
+  },
+  {
+    area: "tributário",
+    linha: "o princípio da anterioridade nonagesimal não se aplica ao iof nem ao ii",
+    termo: "exceções à anterioridade",
+    semantica: "Exceções constitucionais aos prazos de espera tributária (art. 150, §1º da CF).",
+    virada: {
+      titulo: "Exceções à noventena",
+      raciocinio:
+        "Imposto de Importação (II), Imposto de Exportação (IE), Imposto sobre Operações Financeiras (IOF) e Imposto Extraordinário de Guerra entram em vigor imediatamente à publicação da lei.",
+      exemplo:
+        "Decreto aumenta alíquota do IOF em 1º de dezembro: pode ser cobrado no mesmo dia sem aguardar o ano seguinte nem a noventena de 90 dias.",
     },
   },
   {
@@ -668,6 +778,19 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "administrativo",
+    linha: "a nova lei de licitações extinguiu as modalidades convite e tomada de preços",
+    termo: "modalidades na lei 14.133",
+    semantica: "Estruturação das modalidades licitatórias no art. 28 da Lei 14.133/2021.",
+    virada: {
+      titulo: "Rol do art. 28 da Lei 14.133",
+      raciocinio:
+        "A Lei 14.133/21 extinguiu o convite e a tomada de preços, prevendo: pregão, concorrência, concurso, leilão e diálogo competitivo.",
+      exemplo:
+        "Município publica edital na modalidade 'convite' sob a égide da nova lei: a licitação padece de vício insanável de modalidade inexistente.",
+    },
+  },
+  {
     area: "empresarial",
     linha: "o aval é obrigação cambial autônoma e independe da validade da obrigação principal",
     termo: "autonomia do aval",
@@ -693,6 +816,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
         "O credor titular de garantia fiduciária sobre recebíveis mercantis ou veículos não se sujeita aos efeitos da recuperação judicial, podendo reter os recursos diretamente.",
       exemplo:
         "Empresa em recuperação pede devolução de valores retidos pelo banco por trava bancária de duplicatas: o juízo da recuperação não pode liberar as travas fiduciárias.",
+    },
+  },
+  {
+    area: "empresarial",
+    linha: "o endosso transmite o título e garante o pagamento e a cessão não garante solvência",
+    termo: "endosso x cessão",
+    semantica:
+      "Mecanismos de circulação de crédito cambial e civil (arts. 914 do CC e Lei Uniforme de Genebra).",
+    virada: {
+      titulo: "Responsabilidade do endossante",
+      raciocinio:
+        "O endossante garante a existência do crédito e o pagamento pelo devedor (salvo cláusula sem garantia). O cedente civil responde apenas pela existência do crédito, mas não pela solvência do devedor.",
+      exemplo:
+        "Credor endossa cheque: se o emitente não pagar por falta de fundos, o portador pode executar diretamente o endossante.",
     },
   },
   {
@@ -723,6 +860,19 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "consumidor",
+    linha: "a repetição do indébito por cobrança indevida independe de prova de dolo ou culpa",
+    termo: "devolução em dobro",
+    semantica: "Tese fixada pelo STJ no EAREsp 600.666 sobre o art. 42, parágrafo único do CDC.",
+    virada: {
+      titulo: "Engano justificável no STJ",
+      raciocinio:
+        "A restituição em dobro do indébito no CDC independe da comprovação de má-fé ou dolo do fornecedor, bastando a conduta contrária à boa-fé objetiva; só se afasta com engano justificável.",
+      exemplo:
+        "Operadora de telefonia cobra taxa indevida por 2 anos: deve devolver em dobro todo o valor cobrado, salvo prova de erro escusável imprevisível.",
+    },
+  },
+  {
     area: "criança",
     linha: "a internação de adolescente é restrita a hipóteses taxativas com limite de três anos",
     termo: "internação socioeducativa",
@@ -734,6 +884,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
         "A internação só cabe em: infração cometida com violência ou grave ameaça; reiteração de infrações graves; ou descumprimento reiterado de medida anterior. Não cabe por tráfico simples.",
       exemplo:
         "Adolescente primário apreendido com drogas sem arma nem violência: o juiz não pode decretar internação (Súmula 492 do STJ).",
+    },
+  },
+  {
+    area: "criança",
+    linha: "a remissão ministerial concedida antes do processo não implica confissão de culpa",
+    termo: "remissão ministerial",
+    semantica:
+      "Forma de exclusão do processo socioeducativo concedida pelo Ministério Público (arts. 126 a 128 do ECA).",
+    virada: {
+      titulo: "Ausência de antecedentes na remissão",
+      raciocinio:
+        "A remissão concedida pelo MP como forma de exclusão do procedimento não prevalece para efeito de reincidência nem gera antecedentes infracionais ao adolescente.",
+      exemplo:
+        "Adolescente que recebeu remissão ministerial pratica novo ato: deve ser considerado primário para todos os efeitos legais.",
     },
   },
   {
@@ -751,6 +915,19 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "ambiental",
+    linha: "o princípio da precaução inverte o ônus da prova contra a atividade degradadora",
+    termo: "precaução x prevenção",
+    semantica: "Diretrizes basilares do direito ecológico internacional (Súmula 618 do STJ).",
+    virada: {
+      titulo: "Súmula 618 do STJ",
+      raciocinio:
+        "A inversão do ônus da prova aplica-se às ações de degradação ambiental. Na dúvida científica sobre perigo de dano grave ou irreversível, adota-se a precaução.",
+      exemplo:
+        "Empreendedor que pretende instalar usina química deve provar tecnicamente a inofensividade da atividade sob pena de embargo judicial.",
+    },
+  },
+  {
     area: "previdenciário",
     linha: "o período de graça mantém a qualidade de segurado mesmo sem recolhimento",
     termo: "período de graça",
@@ -765,6 +942,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "previdenciário",
+    linha: "o benefício de pensão por morte independe de período de carência",
+    termo: "isenção de carência",
+    semantica:
+      "Disposições do art. 26 da Lei 8.213/91 sobre benefícios sem exigência de número mínimo de contribuições.",
+    virada: {
+      titulo: "Art. 26 da Lei 8.213",
+      raciocinio:
+        "Pensão por morte, salário-família e auxílio-acidente independem de carência: basta que o falecido detivesse a qualidade de segurado na data do óbito, ainda que com 1 contribuição.",
+      exemplo:
+        "Trabalhador contratado há 5 dias morre em acidente: a viúva tem direito à pensão por morte mesmo sem 12 ou 180 meses de contribuição prévia.",
+    },
+  },
+  {
     area: "eleitoral",
     linha: "a inelegibilidade reflexa alcança parentes até o segundo grau do chefe do executivo",
     termo: "inelegibilidade reflexa",
@@ -776,6 +967,19 @@ export const BANK: { area: string; item: StudyItem }[] = [
         "A dissolução do casamento ou da união estável no curso do mandato não afasta a inelegibilidade reflexa para o mesmo território de jurisdição do titular.",
       exemplo:
         "Esposa de prefeito se divorcia amigavelmente 6 meses antes da eleição para concorrer a prefeita no mesmo município: candidatura indeferida pela SV 18.",
+    },
+  },
+  {
+    area: "eleitoral",
+    linha: "as condições de elegibilidade são aferidas na formalização do registro",
+    termo: "momento do registro",
+    semantica: "Marco temporal estipulado no art. 11, §10 da Lei 9.504/1997.",
+    virada: {
+      titulo: "Art. 11, §10 da Lei 9.504",
+      raciocinio:
+        "As condições de elegibilidade e causas de inelegibilidade são aferidas no registro, ressalvadas alterações fáticas ou jurídicas supervenientes que afastem a inelegibilidade.",
+      exemplo:
+        "Candidato obtém liminar anulando condenação de contas após o pedido de registro mas antes do julgamento: a liminar superveniente é acolhida para deferir o registro.",
     },
   },
   {
@@ -794,6 +998,19 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "internacional",
+    linha: "o brasileiro naturalizado pode ser extraditado em caso de crime comum praticado antes",
+    termo: "extradição de brasileiro",
+    semantica: "Regime constitucional da extradição passiva de cidadãos (art. 5º, LI da CF).",
+    virada: {
+      titulo: "Art. 5º, LI da CF",
+      raciocinio:
+        "Nenhum brasileiro nato é extraditado. O naturalizado só pode ser extraditado em duas hipóteses: crime comum praticado antes da naturalização, ou envolvimento com tráfico de drogas a qualquer tempo.",
+      exemplo:
+        "Cidadão naturalizado comete homicídio nos EUA após a naturalização: não pode ser extraditado para julgamento no exterior.",
+    },
+  },
+  {
     area: "direitos humanos",
     linha: "a prisão civil do depositário infiel é ilícita em qualquer modalidade no brasil",
     termo: "súmula vinculante 25",
@@ -805,6 +1022,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
         "É ilícita a prisão civil de depositário infiel, qualquer que seja a modalidade do depósito. No ordenamento brasileiro, a única prisão civil admitida é a do devedor de alimentos.",
       exemplo:
         "Juiz cível decreta prisão de devedor fiduciário que vendeu o carro financiado: ato flagrantemente nulo e ilegal por violação à SV 25.",
+    },
+  },
+  {
+    area: "direitos humanos",
+    linha: "o controle de convencionalidade afasta leis internas incompatíveis com tratados",
+    termo: "controle de convencionalidade",
+    semantica:
+      "Dever de magistrados e tribunais nacionais de adequar a legislação local aos tratados de direitos humanos ratificados.",
+    virada: {
+      titulo: "Efeito paralisante de leis",
+      raciocinio:
+        "Leis internas que conflitam com tratados de direitos humanos de status supralegal têm sua eficácia suspensa, não podendo ser aplicadas pelos juízes e tribunais brasileiros.",
+      exemplo:
+        "Norma do CPC que previa prisão de depositário foi paralisada pela Convenção Americana sobre Direitos Humanos (Pacto de San José).",
     },
   },
   {
@@ -821,6 +1052,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
     },
   },
   {
+    area: "filosofia",
+    linha: "a teoria pura do direito de kelsen separa estritamente o ser do dever ser",
+    termo: "teoria pura do direito",
+    semantica:
+      "Concepção positivista de Hans Kelsen que expurga elementos morais e sociológicos da ciência jurídica.",
+    virada: {
+      titulo: "Norma fundamental hipotética",
+      raciocinio:
+        "A validade de uma norma decorre unicamente de sua conformidade formal com a norma hierarquicamente superior, culminando na norma fundamental hipotética, independente de juízos de justiça moral.",
+      exemplo:
+        "Lei formalmente aprovada pelo processo legislativo é válida e eficaz perante a teoria kelseniana, mesmo que moralmente injusta perante a opinião pública.",
+    },
+  },
+  {
     area: "financeiro",
     linha: "as leis orçamentárias são de iniciativa privativa do chefe do poder executivo",
     termo: "iniciativa orçamentária",
@@ -831,6 +1076,20 @@ export const BANK: { area: string; item: StudyItem }[] = [
         "Plano Plurianual (PPA), Lei de Diretrizes Orçamentárias (LDO) e Lei Orçamentária Anual (LOA) são de iniciativa exclusiva do Chefe do Executivo; projeto apresentado por parlamentar padece de vício de iniciativa insanável.",
       exemplo:
         "Deputado estadual protocola projeto de lei da LDO na Assembleia Legislativa: a lei aprovada é formalmente inconstitucional.",
+    },
+  },
+  {
+    area: "financeiro",
+    linha: "é vedada a vinculação de receita de impostos a órgão ou fundo específico",
+    termo: "não vinculação de impostos",
+    semantica:
+      "Princípio da não afetação das receitas tributárias derivado do art. 167, IV da Constituição Federal.",
+    virada: {
+      titulo: "Art. 167, IV da CF",
+      raciocinio:
+        "A receita de impostos não pode ser previamente vinculada a órgãos, fundos ou despesas específicas, ressalvadas exclusivamente saúde, educação, administração tributária e garantias à União.",
+      exemplo:
+        "Lei estadual vincula 10% da arrecadação de IPVA para asfaltamento de rodovias: inconstitucional por violar o art. 167, IV da CF.",
     },
   },
 ];
