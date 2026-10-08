@@ -118,10 +118,6 @@ function RootShell({ children }: { children: ReactNode }) {
               "try{var t=localStorage.getItem('lextype-theme')||'dark';document.documentElement.classList.remove('dark','light','sepia','oled');document.documentElement.classList.add(t)}catch(e){}",
           }}
         />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Quicksand:wght@400;600;700&display=swap"
-          rel="stylesheet"
-        />
         <HeadContent />
       </head>
       <body>

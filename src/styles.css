@@ -146,30 +146,30 @@
 }
 
 .aquarela {
-  --background: #faf7f2;
-  --foreground: #3a3238;
-  --card: #faf7f2;
-  --card-foreground: #3a3238;
-  --popover: #faf7f2;
-  --popover-foreground: #3a3238;
-  --primary: #c8b6e2;
-  --primary-foreground: #2d2638;
-  --secondary: #efece6;
-  --secondary-foreground: #3a3238;
-  --muted: #efece6;
-  --muted-foreground: #7a7078;
-  --accent: #f4d4d4;
-  --accent-foreground: #3a3238;
-  --destructive: #f5c6b8;
-  --destructive-foreground: #3a3238;
-  --border: #dcd6cd;
-  --input: #efece6;
-  --ring: #c8b6e2;
-  --gold: #c8b6e2;
-  --gold-foreground: #2d2638;
-  --keycap: #efece6;
-  --keycap-foreground: #3a3238;
-  --success: #cbe4d6;
+  --background: oklch(0.97 0.03 200);
+  --foreground: oklch(0.35 0.05 260);
+  --card: oklch(0.99 0.01 200);
+  --card-foreground: oklch(0.35 0.05 260);
+  --popover: oklch(0.99 0.01 200);
+  --popover-foreground: oklch(0.35 0.05 260);
+  --primary: oklch(0.75 0.12 330);
+  --primary-foreground: oklch(0.99 0.02 330);
+  --secondary: oklch(0.93 0.04 200);
+  --secondary-foreground: oklch(0.4 0.06 260);
+  --muted: oklch(0.93 0.04 200);
+  --muted-foreground: oklch(0.6 0.05 260);
+  --accent: oklch(0.9 0.06 200);
+  --accent-foreground: oklch(0.35 0.05 260);
+  --destructive: oklch(0.75 0.15 15);
+  --destructive-foreground: oklch(0.99 0.02 15);
+  --border: oklch(0.9 0.04 200);
+  --input: oklch(0.9 0.04 200);
+  --ring: oklch(0.75 0.12 330);
+  --gold: oklch(0.85 0.15 75);
+  --gold-foreground: oklch(0.4 0.1 75);
+  --keycap: oklch(0.96 0.02 200);
+  --keycap-foreground: oklch(0.4 0.06 260);
+  --success: oklch(0.8 0.15 140);
 }
 @layer base {
   * {
@@ -179,7 +179,7 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: "Nunito", "Quicksand", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
 }
 
