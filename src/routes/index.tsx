@@ -164,6 +164,10 @@ function Index() {
   const [pinned, setPinned] = useState<StudyItem | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [keyboardMode, setKeyboardMode] = useState<"heatmap" | "rainbow">(() => {
+    if (typeof localStorage === "undefined") return "heatmap";
+    return (localStorage.getItem("lextype-keyboard-mode") as any) || "rainbow";
+  });
   const [uiScale, setUiScale] = useState<KeyboardScale>("normal");
   const [restartOnError, setRestartOnError] = useState(false);
   const [stopOnError, setStopOnError] = useState(true);
