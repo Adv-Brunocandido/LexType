@@ -1420,7 +1420,7 @@ function Legend({ cls, label }: { cls: string; label: string }) {
 
 function LessonCard({ item, onClose }: { item: StudyItem; onClose: () => void }) {
   return (
-    <div className="animate-pop-in relative space-y-4 rounded-xl border border-gold/40 bg-gold/5 p-5">
+    <div className="animate-pop-in relative space-y-4 rounded-xl border border-gold/40 bg-gold/5 p-5 resize-y overflow-auto min-h-[200px]">
       <button
         onClick={onClose}
         className="absolute right-3 top-3 rounded-md px-2 text-muted-foreground hover:text-foreground"
