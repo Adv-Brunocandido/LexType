@@ -127,7 +127,6 @@ interface SessionResult {
 }
 
 const COMBO_MILESTONES = [10, 25, 50, 75, 100, 150, 200];
-const DAILY_GOAL = 5;
 
 function Index() {
   const [selectedKeys, setSelectedKeys] = useState<string[]>(KEY_GROUPS.Central);
