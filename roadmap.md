@@ -51,9 +51,10 @@
 Consulte o documento completo em [PRD.md](file:///c:/FOLDER%20APPS/LexType/PRD.md).
 
 ### 1. Mecânica Central & Editor de Texto
+
 - [ ] **Modos Strict vs. Fluid:** Alternador `stopOnError`:
-  - *Strict:* Trava no caractere errado até acertar a tecla correta.
-  - *Fluid:* Permite continuar digitando com erros em vermelho, exigindo `Backspace` para corrigir antes de concluir.
+  - _Strict:_ Trava no caractere errado até acertar a tecla correta.
+  - _Fluid:_ Permite continuar digitando com erros em vermelho, exigindo `Backspace` para corrigir antes de concluir.
 - [ ] **Smooth Caret:** Cursor ultra-suave com interpolação CSS (`transition: left 0.1s ease, top 0.1s ease`).
 - [ ] **Line Preview Container:** Rolagem vertical suave mantendo a linha ativa centralizada.
 - [ ] **Navegação Zero Mouse (Atalhos Globais):**
@@ -61,6 +62,7 @@ Consulte o documento completo em [PRD.md](file:///c:/FOLDER%20APPS/LexType/PRD.m
   - `Escape` -> Abertura de Command Palette (paleta de comandos estilo IDE para temas, modos e configurações).
 
 ### 2. Geração de Texto & Filtros de Conteúdo
+
 - [ ] **Toggles de Complexidade:**
   - `includeCapitalization`: Maiúsculas distribuídas organicamente.
   - `includePunctuation`: Injeção de pontuação (`.`, `,`, `?`, `!`).
@@ -70,6 +72,7 @@ Consulte o documento completo em [PRD.md](file:///c:/FOLDER%20APPS/LexType/PRD.m
 - [ ] **Importação Customizada:** Divisão automática de texto colado em blocos ergonômicos de 30 palavras.
 
 ### 3. Métricas, Telemetria & Integridade Competitiva
+
 - [ ] **Heatmap com Latência por Tecla:** Registro de `latencyMs` por caractere e injeção adaptativa de teclas com latência > 300ms.
 - [ ] **Meta de Precisão:** Multiplicador e mensagem pedagógica ao atingir Precisão >= 95%.
 - [ ] **Streak Cumulativo de Tempo:** Incremento de streak diário após 5 minutos cumulativos de treino na janela de 24h.

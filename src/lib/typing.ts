@@ -241,3 +241,112 @@ export const loadNum = (key: string, def: number) => {
   return Number.isFinite(v) && localStorage.getItem(key) !== null ? v : def;
 };
 export const saveNum = (key: string, v: number) => localStorage.setItem(key, String(v));
+
+// ---------------- módulos de complexidade ----------------
+
+export interface TextModifiers {
+  capitals: boolean;
+  punctuation: boolean;
+  symbols: boolean;
+}
+
+export const NO_MODIFIERS: TextModifiers = { capitals: false, punctuation: false, symbols: false };
+
+const MID_PUNCT = [",", ",", ".", "?", "!"];
+const SENTENCE_END = /[.?!]$/;
+
+function capitalize(word: string): string {
+  const i = word.search(/\p{L}/u);
+  if (i < 0) return word;
+  return word.slice(0, i) + word.charAt(i).toUpperCase() + word.slice(i + 1);
+}
+
+/** Acrescenta maiúsculas, pontuação e símbolos ao texto gerado, conforme os módulos ativos. */
+export function applyModifiers(
+  text: string,
+  mods: TextModifiers,
+  opts: { allowSection?: boolean; random?: () => number } = {},
+): string {
+  if (!mods.capitals && !mods.punctuation && !mods.symbols) return text;
+  const r = opts.random ?? Math.random;
+  const symbolKinds = ["@", "#", "$", "_", ...(opts.allowSection === false ? [] : ["§"])];
+  const words = text.split(" ").filter(Boolean);
+  const out: string[] = [];
+  let sentenceStart = true;
+
+  for (let i = 0; i < words.length; i++) {
+    let w = words[i]!;
+    const isLast = i === words.length - 1;
+
+    if (mods.capitals && (sentenceStart || r() < 0.2)) w = capitalize(w);
+
+    if (mods.symbols && r() < 0.18) {
+      const kind = symbolKinds[Math.floor(r() * symbolKinds.length)] ?? "@";
+      if (kind === "§") out.push("§");
+      else if (kind === "_" && !isLast) {
+        const next = words[++i]!;
+        w = `${w}_${next}`;
+      } else if (kind !== "_") w = `${kind}${w}`;
+    }
+
+    const lastNow = i === words.length - 1;
+    if (mods.punctuation) {
+      if (lastNow) w += SENTENCE_END.test(w) ? "" : ".";
+      else if (r() < 0.22) w += MID_PUNCT[Math.floor(r() * MID_PUNCT.length)] ?? ",";
+    }
+    sentenceStart = SENTENCE_END.test(w);
+    out.push(w);
+  }
+  return out.join(" ");
+}
+
+// ---------------- desafio diário de 5 minutos ----------------
+
+const PRACTICE_KEY = "lextype-practice";
+export const DAILY_CHALLENGE_SECONDS = 300;
+
+function loadPractice(): Record<string, number> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(PRACTICE_KEY) ?? "{}");
+    return raw && typeof raw === "object" ? (raw as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Soma segundos de prática efetiva ao dia informado e devolve o total do dia. */
+export function addPracticeSeconds(seconds: number, date: Date = new Date()): number {
+  const key = toLocalDateString(date);
+  const all = loadPractice();
+  if (!Number.isFinite(seconds) || seconds <= 0) return all[key] ?? 0;
+  all[key] = Math.round((all[key] ?? 0) + seconds);
+  localStorage.setItem(PRACTICE_KEY, JSON.stringify(all));
+  return all[key];
+}
+
+export function practiceSecondsToday(): number {
+  return loadPractice()[toLocalDateString()] ?? 0;
+}
+
+/** Dias consecutivos que atingiram a meta. Hoje incompleto não quebra a sequência. */
+export function practiceStreak(minSeconds = DAILY_CHALLENGE_SECONDS): number {
+  const all = loadPractice();
+  const done = (d: Date) => (all[toLocalDateString(d)] ?? 0) >= minSeconds;
+  const d = new Date();
+  if (!done(d)) d.setDate(d.getDate() - 1);
+  let streak = 0;
+  while (done(d)) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+// ---------------- precisão > velocidade ----------------
+
+/** Bônus percentual de XP por precisão: 25% a partir de 95%, 50% a partir de 97%. */
+export function precisionBonus(accuracy: number): 0 | 25 | 50 {
+  if (accuracy >= 97) return 50;
+  if (accuracy >= 95) return 25;
+  return 0;
+}

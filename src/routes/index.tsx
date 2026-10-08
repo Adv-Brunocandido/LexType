@@ -34,10 +34,24 @@ import {
   sessionsToday,
   streakDays,
   weakestKeys,
+  applyModifiers,
+  precisionBonus,
+  addPracticeSeconds,
+  type TextModifiers,
+  NO_MODIFIERS,
   type KeyStats,
   type Mode,
 } from "@/lib/typing";
 import { cn } from "@/lib/utils";
+import {
+  type Engine,
+  newEngine,
+  typeChar,
+  backspace,
+  restartLine,
+  isComplete,
+  pendingErrors,
+} from "@/lib/engine";
 
 export type ThemeMode = "dark" | "light" | "sepia" | "oled";
 export type PanelLayout = "stack" | "split" | "keyboard-top";
@@ -123,38 +137,6 @@ const FALLBACK_STUDY: StudyItem[] = [
   },
 ];
 
-interface Engine {
-  text: string;
-  pos: number;
-  errors: number;
-  errorMap: Record<string, number>;
-  hitMap: Record<string, number>;
-  timeMap: Record<string, number>;
-  timedMap: Record<string, number>;
-  combo: number;
-  maxCombo: number;
-  startedAt: number | null;
-  lastAt: number | null;
-  errStreak: number;
-  wrongAt: number | null;
-}
-
-const newEngine = (text: string): Engine => ({
-  text,
-  pos: 0,
-  errors: 0,
-  errorMap: {},
-  hitMap: {},
-  timeMap: {},
-  timedMap: {},
-  combo: 0,
-  maxCombo: 0,
-  startedAt: null,
-  lastAt: null,
-  errStreak: 0,
-  wrongAt: null,
-});
-
 interface SessionResult {
   wpm: number;
   accuracy: number;
@@ -184,6 +166,8 @@ function Index() {
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [uiScale, setUiScale] = useState<KeyboardScale>("normal");
   const [restartOnError, setRestartOnError] = useState(false);
+  const [stopOnError, setStopOnError] = useState(true);
+  const [modifiers, setModifiers] = useState<TextModifiers>(NO_MODIFIERS);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [volume, setVolumeState] = useState(0.6);
   const eng = useRef<Engine>(newEngine(""));
@@ -291,10 +275,20 @@ function Index() {
       if (m === "automatico") {
         const r = adaptiveRoute(keys, stats);
         setRoute(r);
-        loadText(generateText({ mode: "palavras", keys: r.target, weak: r.weak, level: lvl }));
+        loadText(
+          applyModifiers(
+            generateText({ mode: "palavras", keys: r.target, weak: r.weak, level: lvl }),
+            modifiers,
+          ),
+        );
       } else {
         setRoute(null);
-        loadText(generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl }));
+        loadText(
+          applyModifiers(
+            generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl }),
+            modifiers,
+          ),
+        );
       }
     },
     [effectiveArea, loadText, nextStudy, studyQueue],
@@ -324,6 +318,13 @@ function Index() {
 
     const savedRigor = localStorage.getItem("lextype-restart-on-error") === "1";
     setRestartOnError(savedRigor);
+    const savedStopOnError = localStorage.getItem("lextype-stop-on-error") !== "0";
+    setStopOnError(savedStopOnError);
+
+    try {
+      const savedMods = JSON.parse(localStorage.getItem("lextype-modifiers") || "null");
+      if (savedMods) setModifiers(savedMods);
+    } catch {}
 
     const savedVol = Number(localStorage.getItem("lextype-volume"));
     if (Number.isFinite(savedVol) && localStorage.getItem("lextype-volume") !== null) {
@@ -378,6 +379,11 @@ function Index() {
     }
     saveKeyStats(stats);
     setKeyStats(stats);
+
+    // Save practice seconds
+    if (e.startedAt) {
+      addPracticeSeconds(Math.round((now - e.startedAt) / 1000));
+    }
 
     let levelChange = 0;
     if (mode === "automatico") {
@@ -841,8 +847,8 @@ function Index() {
               <div className="flex overflow-hidden rounded-md border border-border">
                 {(
                   [
-                    { id: "abnt2", label: "🇧🇷 ABNT2 (com Ç)" },
-                    { id: "ansi", label: "🇺🇸 ANSI (sem Ç)" },
+                    { id: "abnt2", label: "🇧🇷 ABNT2" },
+                    { id: "ansi", label: "🇺🇸 ANSI" },
                   ] as const
                 ).map((k) => (
                   <button
@@ -1231,7 +1237,7 @@ function Index() {
                     Teclado Visual & Dedilhado
                   </span>
                   <span className="rounded bg-secondary px-2 py-0.5 text-[0.65rem] font-mono-type text-gold uppercase font-bold">
-                    {keyboardLayout === "ansi" ? "ANSI (US - sem Ç)" : "ABNT2 (Brasil)"}
+                    {keyboardLayout === "ansi" ? "ANSI US" : "ABNT2"}
                   </span>
                 </div>
 
