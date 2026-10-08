@@ -67,11 +67,12 @@ Gere exatamente ${data.count} itens. Cada item:
 ATENÇÃO: Sua base de conhecimento deve ser estritamente segura. Não invente súmulas ou jurisprudência. Utilize apenas fontes consolidadas. Responda em JSON.`;
 
     const models = [
-      "google/gemini-2.5-pro",
-      "deepseek/deepseek-chat",
-      "anthropic/claude-3-7-sonnet",
+      "openai/gpt-6-astra", // Alias original / prioritário
       "openai/gpt-4o",
       "openai/gpt-4o-mini",
+      "anthropic/claude-3-5-sonnet",
+      "google/gemini-1.5-pro",
+      "deepseek/deepseek-chat",
     ];
 
     let res;
@@ -90,9 +91,13 @@ ATENÇÃO: Sua base de conhecimento deve ser estritamente segura. Não invente s
             model: model,
             stream: true,
             store: false,
+            ...(model.includes("astra") || model.includes("o3")
+              ? { reasoning: { effort: "low" } }
+              : {}),
             instructions:
               "Você é um professor catedrático de Direito brasileiro, preciso e técnico. Forneça apenas informações com segurança jurídica absoluta.",
             input: prompt,
+            // Alguns modelos no gateway podem rejeitar json_schema strict. Se falhar, tentamos o próximo.
             text: { format: { type: "json_schema", name: "estudo", strict: true, schema } },
           }),
         });
