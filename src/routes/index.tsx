@@ -207,7 +207,14 @@ function Index() {
   }, []);
 
   const loadText = useCallback((text: string) => {
-    eng.current = newEngine(text);
+    const cleanText = text
+      .replace(/[\u00A0\u200B]/g, " ")
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/[–—]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim();
+    eng.current = newEngine(cleanText);
     consumed.current = 0;
     if (inputRef.current) inputRef.current.value = "";
     setElapsed(0);
@@ -323,6 +330,7 @@ function Index() {
     // Inicia o primeiro texto
     reset("automatico", KEY_GROUPS.Central, st, lvl);
     say("start");
+    setTimeout(() => inputRef.current?.focus(), 150);
   }, []);
 
   // Timer de sessão
@@ -414,6 +422,7 @@ function Index() {
       if (result || !e.text || e.pos >= e.text.length) return;
       const outcome = typeChar(e, ch, {
         stopOnError: prefsRef.current.stopOnError,
+        caseSensitive: prefsRef.current.caps,
         layout: keyboardLayout,
         now: Date.now(),
       });
@@ -466,12 +475,13 @@ function Index() {
 
   const handleInput = (el: HTMLInputElement, final: boolean) => {
     const v = el.value;
+    if (!v) return;
     if (v.length < consumed.current) {
       consumed.current = v.length;
       return;
     }
     let fresh = v.slice(consumed.current);
-    if (!final && composing.current && /[´`~^¨]$/.test(fresh)) fresh = fresh.slice(0, -1);
+    if (!final && /[´`~^¨]$/.test(fresh)) fresh = fresh.slice(0, -1);
     for (const ch of fresh) processChar(ch);
     consumed.current += fresh.length;
     if (final || !composing.current) {
@@ -483,17 +493,33 @@ function Index() {
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       const t = ev.target as HTMLElement;
-      if (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
+      if (t.tagName === "SELECT" || t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && t !== inputRef.current)) return;
       if (ev.key === "Enter" && result) {
         ev.preventDefault();
         goNextRef.current();
         return;
       }
-      if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) inputRef.current?.focus();
+      if (ev.key === "Backspace") {
+        ev.preventDefault();
+        handleBackspace();
+        return;
+      }
+      if (ev.key === "Tab") {
+        ev.preventDefault();
+        handleRestartLine();
+        return;
+      }
+      if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey && !ev.altKey && !ev.isComposing) {
+        ev.preventDefault();
+        if (inputRef.current && document.activeElement !== inputRef.current) {
+          inputRef.current.focus();
+        }
+        processChar(ev.key);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [result]);
+  }, [result, processChar]);
 
   const applyTheme = (t: ThemeMode) => {
     setTheme(t);
@@ -958,6 +984,7 @@ function Index() {
 
         {/* Área de digitação redimensionável */}
         <section
+          onClick={() => inputRef.current?.focus()}
           className={cn(
             "relative rounded-xl border bg-card p-5 transition-shadow sm:p-8 resize-y overflow-auto min-h-[220px]",
             focused ? "border-gold/50 ring-2 ring-ring/30" : "border-border",
@@ -1048,16 +1075,6 @@ function Index() {
                   handleInput(ev.currentTarget, true);
                 }}
                 onInput={(ev) => handleInput(ev.currentTarget, false)}
-                onKeyDown={(ev) => {
-                  if (
-                    ev.key === "Backspace" &&
-                    !composing.current &&
-                    ev.currentTarget.value === ""
-                  ) {
-                    ev.preventDefault();
-                    handleBackspace();
-                  }
-                }}
               />
             </>
           )}

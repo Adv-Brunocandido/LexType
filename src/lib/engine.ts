@@ -56,11 +56,21 @@ export const pendingErrors = (e: Engine): number => e.marks.filter(Boolean).leng
 export const isComplete = (e: Engine): boolean =>
   e.text.length > 0 && e.pos >= e.text.length && pendingErrors(e) === 0;
 
-function matches(typed: string, expected: string, caseSensitive = true): boolean {
-  if (typed === expected) return true;
+export function normalizeCompare(c: string): string {
+  if (c === "\u00A0" || c === "\u200B") return " ";
+  if (c === "“" || c === "”") return '"';
+  if (c === "‘" || c === "’") return "'";
+  if (c === "–" || c === "—") return "-";
+  return c;
+}
+
+export function matches(typed: string, expected: string, caseSensitive = false): boolean {
+  const tNorm = normalizeCompare(typed);
+  const eNorm = normalizeCompare(expected);
+  if (tNorm === eNorm) return true;
   return caseSensitive
-    ? strip(typed) === strip(expected)
-    : strip(typed).toLowerCase() === strip(expected).toLowerCase();
+    ? strip(tNorm) === strip(eNorm)
+    : strip(tNorm).toLowerCase() === strip(eNorm).toLowerCase();
 }
 
 export function typeChar(e: Engine, ch: string, o: TypeOptions): TypeOutcome {
@@ -75,7 +85,7 @@ export function typeChar(e: Engine, ch: string, o: TypeOptions): TypeOutcome {
   const layout = o.layout ?? "abnt2";
   const keys = charToKeys(expected, layout);
 
-  if (matches(ch, expected, o.caseSensitive ?? true)) {
+  if (matches(ch, expected, o.caseSensitive ?? false)) {
     const dt = now - (e.lastAt ?? now);
     for (const k of keys) {
       e.hitMap[k] = (e.hitMap[k] ?? 0) + 1;
