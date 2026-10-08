@@ -5,23 +5,14 @@ export const soundSettings = { enabled: true, volume: 0.6 };
 function ac(): AudioContext | null {
   if (typeof window === "undefined" || !soundSettings.enabled) return null;
   if (!ctx) {
-    const C =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const C = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     ctx = new C();
   }
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
 }
 
-function tone(
-  freq: number,
-  start: number,
-  dur: number,
-  type: OscillatorType,
-  gain: number,
-  endFreq?: number,
-) {
+function tone(freq: number, start: number, dur: number, type: OscillatorType, gain: number, endFreq?: number) {
   const a = ac();
   if (!a) return;
   const t = a.currentTime + start;
@@ -67,27 +58,7 @@ export function playCombo() {
   tone(1320, 0.07, 0.12, "sine", 0.1);
 }
 
-export function setVolume(vol: number) {
-  soundSettings.volume = Math.max(0, Math.min(1, vol));
-}
-
-export type WinTier = "normal" | "epic" | "grand";
-
-export function playWin(tier: WinTier = "normal") {
-  if (tier === "normal") {
-    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.1, 0.25, "triangle", 0.16));
-    [523.25, 659.25, 783.99].forEach((f) => tone(f, 0.45, 0.7, "sine", 0.08));
-  } else if (tier === "epic") {
-    // Acordes expandidos e harmônicos brilhantes
-    [523.25, 659.25, 783.99, 987.77, 1046.5, 1318.5].forEach((f, i) =>
-      tone(f, i * 0.08, 0.3, "triangle", 0.18),
-    );
-    [659.25, 783.99, 1046.5, 1318.5].forEach((f) => tone(f, 0.5, 0.9, "sine", 0.1));
-  } else {
-    // Fanfarra triunfal para subida de nível ou maestria extrema
-    [392.0, 523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98].forEach((f, i) =>
-      tone(f, i * 0.07, 0.35, "triangle", 0.2),
-    );
-    [523.25, 783.99, 1046.5, 1567.98].forEach((f) => tone(f, 0.55, 1.2, "sine", 0.12));
-  }
+export function playWin() {
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.1, 0.25, "triangle", 0.16));
+  [523.25, 659.25, 783.99].forEach((f) => tone(f, 0.45, 0.7, "sine", 0.08));
 }

@@ -6,10 +6,3 @@ pnpm-lock.yaml
 package-lock.json
 bun.lock
 routeTree.gen.ts
-.agents
-.agent
-skills
-agent
-data
-.playwright-cli
-

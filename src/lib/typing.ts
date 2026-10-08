@@ -3,7 +3,7 @@ import { KEY_GROUPS, TRAINABLE_KEYS, charToKeys, keyToChar } from "./abnt2";
 
 export type Mode = "automatico" | "aquecimento" | "palavras" | "frases";
 
-const rand = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)] as T;
+const rand = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)] as T;
 
 function weightedPick<T>(items: [T, number][]): T {
   const total = items.reduce((s, [, w]) => s + w, 0);
@@ -36,7 +36,7 @@ function citations(target: Set<string>): string[] {
 }
 
 function score(text: string, target: Set<string>, weak: Set<string>): number {
-  const keys = [...text].filter((c) => c !== " ").flatMap((c) => charToKeys(c));
+  const keys = [...text].filter((c) => c !== " ").flatMap(charToKeys);
   if (!keys.length) return 0;
   const hits = keys.filter((k) => target.has(k)).length;
   if (!hits) return 0;
@@ -44,14 +44,9 @@ function score(text: string, target: Set<string>, weak: Set<string>): number {
   return (hits / keys.length) ** 2 * (1 + weakHits * 0.8) + hits * 0.04;
 }
 
-export function generateText(opts: {
-  mode: Exclude<Mode, "automatico">;
-  keys: string[];
-  weak?: string[];
-  level?: number;
-}): string {
+export function generateText(opts: { mode: Exclude<Mode, "automatico">; keys: string[]; weak?: string[]; level?: number }): string {
   const { mode, weak = [], level = 3 } = opts;
-  const keys = opts.keys.length ? opts.keys : KEY_GROUPS.Central!;
+  const keys = opts.keys.length ? opts.keys : KEY_GROUPS.Central;
   const target = new Set(keys);
   const weakSet = new Set(weak);
   const count = 5 + level;
@@ -68,9 +63,7 @@ export function generateText(opts: {
   }
 
   if (mode === "frases") {
-    const ranked = LEGAL_PHRASES.map(
-      (p) => [p, score(p, target, weakSet) + 0.01] as [string, number],
-    )
+    const ranked = LEGAL_PHRASES.map((p) => [p, score(p, target, weakSet) + 0.01] as [string, number])
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
     const n = level >= 6 ? 3 : 2;
@@ -157,13 +150,8 @@ export function adaptiveRoute(seed: string[], stats: KeyStats) {
     .slice(0, 5)
     .map(([k]) => k);
   let target = [...new Set([...detected, ...seed])].slice(0, 9);
-  if (!target.length) target = KEY_GROUPS.Central!;
-  const weak = [
-    ...new Set([
-      ...detected.slice(0, 3),
-      ...seed.filter((k) => difficultyOf(stats[k]) > 6 || !stats[k]),
-    ]),
-  ].slice(0, 4);
+  if (!target.length) target = KEY_GROUPS.Central;
+  const weak = [...new Set([...detected.slice(0, 3), ...seed.filter((k) => difficultyOf(stats[k]) > 6 || !stats[k])])].slice(0, 4);
   return { target, weak, detected };
 }
 
@@ -171,13 +159,13 @@ export function coachingTip(weak: string[]): string {
   if (weak.length === 0)
     return "Mantenha os dedos ancorados na fileira central (asdf / jklç) e deixe apenas o dedo responsável se mover — o pulso fica estático.";
   const k = weak[0]!;
-  if (KEY_GROUPS.Números!.includes(k))
+  if (KEY_GROUPS.Números.includes(k))
     return `A tecla "${k}" está na fileira de números: é o salto mais longo. Estenda o dedo sem tirar o pulso do lugar e volte à fileira central a cada toque.`;
   if (["´", "~"].includes(k))
     return `"${k}" é tecla morta: pressione-a com o mínimo direito e depois a vogal. Não espere ver o acento antes da vogal — o ritmo é um único movimento.`;
-  if (KEY_GROUPS.Superior!.includes(k))
+  if (KEY_GROUPS.Superior.includes(k))
     return `A tecla "${k.toUpperCase()}" está na fileira superior: estenda o dedo a partir da articulação e retorne imediatamente à tecla de repouso.`;
-  if (KEY_GROUPS.Inferior!.includes(k))
+  if (KEY_GROUPS.Inferior.includes(k))
     return `A tecla "${k.toUpperCase()}" está na fileira inferior: não deixe a mão "viajar" com o dedo. Mantenha os demais dedos ancorados.`;
   return `A tecla "${k.toUpperCase()}": reduza a velocidade em 20% e priorize precisão — velocidade é consequência de repetições corretas.`;
 }
@@ -203,28 +191,12 @@ export function saveSession(r: SessionRecord) {
   localStorage.setItem("lextype-sessions", JSON.stringify(all.slice(-200)));
 }
 
-export function toLocalDateString(d: Date | string = new Date()): string {
-  const dateObj = typeof d === "string" ? new Date(d) : d;
-  if (isNaN(dateObj.getTime())) return "";
-  const year = dateObj.getFullYear();
-  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const day = String(dateObj.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 export function streakDays(): number {
-  const days = new Set(
-    loadSessions()
-      .map((s) => toLocalDateString(s.date))
-      .filter(Boolean),
-  );
+  const days = new Set(loadSessions().map((s) => s.date.slice(0, 10)));
   let streak = 0;
   const d = new Date();
-  const todayStr = toLocalDateString(d);
-  if (!days.has(todayStr)) {
-    d.setDate(d.getDate() - 1);
-  }
-  while (days.has(toLocalDateString(d))) {
+  if (!days.has(d.toISOString().slice(0, 10))) d.setDate(d.getDate() - 1);
+  while (days.has(d.toISOString().slice(0, 10))) {
     streak++;
     d.setDate(d.getDate() - 1);
   }
@@ -232,8 +204,8 @@ export function streakDays(): number {
 }
 
 export function sessionsToday(): number {
-  const today = toLocalDateString();
-  return loadSessions().filter((s) => toLocalDateString(s.date) === today).length;
+  const today = new Date().toISOString().slice(0, 10);
+  return loadSessions().filter((s) => s.date.slice(0, 10) === today).length;
 }
 
 export const loadNum = (key: string, def: number) => {
@@ -241,112 +213,3 @@ export const loadNum = (key: string, def: number) => {
   return Number.isFinite(v) && localStorage.getItem(key) !== null ? v : def;
 };
 export const saveNum = (key: string, v: number) => localStorage.setItem(key, String(v));
-
-// ---------------- módulos de complexidade ----------------
-
-export interface TextModifiers {
-  capitals: boolean;
-  punctuation: boolean;
-  symbols: boolean;
-}
-
-export const NO_MODIFIERS: TextModifiers = { capitals: false, punctuation: false, symbols: false };
-
-const MID_PUNCT = [",", ",", ".", "?", "!"];
-const SENTENCE_END = /[.?!]$/;
-
-function capitalize(word: string): string {
-  const i = word.search(/\p{L}/u);
-  if (i < 0) return word;
-  return word.slice(0, i) + word.charAt(i).toUpperCase() + word.slice(i + 1);
-}
-
-/** Acrescenta maiúsculas, pontuação e símbolos ao texto gerado, conforme os módulos ativos. */
-export function applyModifiers(
-  text: string,
-  mods: TextModifiers,
-  opts: { allowSection?: boolean; random?: () => number } = {},
-): string {
-  if (!mods.capitals && !mods.punctuation && !mods.symbols) return text;
-  const r = opts.random ?? Math.random;
-  const symbolKinds = ["@", "#", "$", "_", ...(opts.allowSection === false ? [] : ["§"])];
-  const words = text.split(" ").filter(Boolean);
-  const out: string[] = [];
-  let sentenceStart = true;
-
-  for (let i = 0; i < words.length; i++) {
-    let w = words[i]!;
-    const isLast = i === words.length - 1;
-
-    if (mods.capitals && (sentenceStart || r() < 0.2)) w = capitalize(w);
-
-    if (mods.symbols && r() < 0.18) {
-      const kind = symbolKinds[Math.floor(r() * symbolKinds.length)] ?? "@";
-      if (kind === "§") out.push("§");
-      else if (kind === "_" && !isLast) {
-        const next = words[++i]!;
-        w = `${w}_${next}`;
-      } else if (kind !== "_") w = `${kind}${w}`;
-    }
-
-    const lastNow = i === words.length - 1;
-    if (mods.punctuation) {
-      if (lastNow) w += SENTENCE_END.test(w) ? "" : ".";
-      else if (r() < 0.22) w += MID_PUNCT[Math.floor(r() * MID_PUNCT.length)] ?? ",";
-    }
-    sentenceStart = SENTENCE_END.test(w);
-    out.push(w);
-  }
-  return out.join(" ");
-}
-
-// ---------------- desafio diário de 5 minutos ----------------
-
-const PRACTICE_KEY = "lextype-practice";
-export const DAILY_CHALLENGE_SECONDS = 300;
-
-function loadPractice(): Record<string, number> {
-  try {
-    const raw: unknown = JSON.parse(localStorage.getItem(PRACTICE_KEY) ?? "{}");
-    return raw && typeof raw === "object" ? (raw as Record<string, number>) : {};
-  } catch {
-    return {};
-  }
-}
-
-/** Soma segundos de prática efetiva ao dia informado e devolve o total do dia. */
-export function addPracticeSeconds(seconds: number, date: Date = new Date()): number {
-  const key = toLocalDateString(date);
-  const all = loadPractice();
-  if (!Number.isFinite(seconds) || seconds <= 0) return all[key] ?? 0;
-  all[key] = Math.round((all[key] ?? 0) + seconds);
-  localStorage.setItem(PRACTICE_KEY, JSON.stringify(all));
-  return all[key];
-}
-
-export function practiceSecondsToday(): number {
-  return loadPractice()[toLocalDateString()] ?? 0;
-}
-
-/** Dias consecutivos que atingiram a meta. Hoje incompleto não quebra a sequência. */
-export function practiceStreak(minSeconds = DAILY_CHALLENGE_SECONDS): number {
-  const all = loadPractice();
-  const done = (d: Date) => (all[toLocalDateString(d)] ?? 0) >= minSeconds;
-  const d = new Date();
-  if (!done(d)) d.setDate(d.getDate() - 1);
-  let streak = 0;
-  while (done(d)) {
-    streak++;
-    d.setDate(d.getDate() - 1);
-  }
-  return streak;
-}
-
-// ---------------- precisão > velocidade ----------------
-
-/** Bônus percentual de XP por precisão: 25% a partir de 95%, 50% a partir de 97%. */
-export function precisionBonus(accuracy: number): 0 | 25 | 50 {
-  if (accuracy >= 97) return 50;
-  if (accuracy >= 95) return 25;
-  return 0;
-}

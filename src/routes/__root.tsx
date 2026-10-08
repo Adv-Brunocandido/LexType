@@ -79,11 +79,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "LexType — Treino de Digitação Jurídica" },
-      {
-        name: "description",
-        content:
-          "Treino de digitação por toque com vocabulário jurídico e teclas-alvo personalizáveis.",
-      },
+      { name: "description", content: "Treino de digitação por toque com vocabulário jurídico e teclas-alvo personalizáveis." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
@@ -114,8 +110,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('lextype-theme')||'dark';document.documentElement.classList.remove('dark','light','sepia','oled','aquarela');document.documentElement.classList.add(t)}catch(e){}",
+            __html: "try{if(localStorage.getItem('lextype-theme')==='light')document.documentElement.classList.remove('dark')}catch(e){}",
           }}
         />
         <HeadContent />
