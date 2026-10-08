@@ -3,7 +3,7 @@ import { KEY_GROUPS, TRAINABLE_KEYS, charToKeys, keyToChar } from "./abnt2";
 
 export type Mode = "automatico" | "aquecimento" | "palavras" | "frases";
 
-const rand = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)] as T;
+const rand = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)] as T;
 
 function weightedPick<T>(items: [T, number][]): T {
   const total = items.reduce((s, [, w]) => s + w, 0);
@@ -36,7 +36,7 @@ function citations(target: Set<string>): string[] {
 }
 
 function score(text: string, target: Set<string>, weak: Set<string>): number {
-  const keys = [...text].filter((c) => c !== " ").flatMap(charToKeys);
+  const keys = [...text].filter((c) => c !== " ").flatMap((c) => charToKeys(c));
   if (!keys.length) return 0;
   const hits = keys.filter((k) => target.has(k)).length;
   if (!hits) return 0;
@@ -44,7 +44,12 @@ function score(text: string, target: Set<string>, weak: Set<string>): number {
   return (hits / keys.length) ** 2 * (1 + weakHits * 0.8) + hits * 0.04;
 }
 
-export function generateText(opts: { mode: Exclude<Mode, "automatico">; keys: string[]; weak?: string[]; level?: number }): string {
+export function generateText(opts: {
+  mode: Exclude<Mode, "automatico">;
+  keys: string[];
+  weak?: string[];
+  level?: number;
+}): string {
   const { mode, weak = [], level = 3 } = opts;
   const keys = opts.keys.length ? opts.keys : KEY_GROUPS.Central!;
   const target = new Set(keys);
@@ -63,7 +68,9 @@ export function generateText(opts: { mode: Exclude<Mode, "automatico">; keys: st
   }
 
   if (mode === "frases") {
-    const ranked = LEGAL_PHRASES.map((p) => [p, score(p, target, weakSet) + 0.01] as [string, number])
+    const ranked = LEGAL_PHRASES.map(
+      (p) => [p, score(p, target, weakSet) + 0.01] as [string, number],
+    )
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
     const n = level >= 6 ? 3 : 2;
@@ -151,7 +158,12 @@ export function adaptiveRoute(seed: string[], stats: KeyStats) {
     .map(([k]) => k);
   let target = [...new Set([...detected, ...seed])].slice(0, 9);
   if (!target.length) target = KEY_GROUPS.Central!;
-  const weak = [...new Set([...detected.slice(0, 3), ...seed.filter((k) => difficultyOf(stats[k]) > 6 || !stats[k])])].slice(0, 4);
+  const weak = [
+    ...new Set([
+      ...detected.slice(0, 3),
+      ...seed.filter((k) => difficultyOf(stats[k]) > 6 || !stats[k]),
+    ]),
+  ].slice(0, 4);
   return { target, weak, detected };
 }
 
@@ -191,12 +203,28 @@ export function saveSession(r: SessionRecord) {
   localStorage.setItem("lextype-sessions", JSON.stringify(all.slice(-200)));
 }
 
+export function toLocalDateString(d: Date | string = new Date()): string {
+  const dateObj = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(dateObj.getTime())) return "";
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function streakDays(): number {
-  const days = new Set(loadSessions().map((s) => s.date.slice(0, 10)));
+  const days = new Set(
+    loadSessions()
+      .map((s) => toLocalDateString(s.date))
+      .filter(Boolean),
+  );
   let streak = 0;
   const d = new Date();
-  if (!days.has(d.toISOString().slice(0, 10))) d.setDate(d.getDate() - 1);
-  while (days.has(d.toISOString().slice(0, 10))) {
+  const todayStr = toLocalDateString(d);
+  if (!days.has(todayStr)) {
+    d.setDate(d.getDate() - 1);
+  }
+  while (days.has(toLocalDateString(d))) {
     streak++;
     d.setDate(d.getDate() - 1);
   }
@@ -204,8 +232,8 @@ export function streakDays(): number {
 }
 
 export function sessionsToday(): number {
-  const today = new Date().toISOString().slice(0, 10);
-  return loadSessions().filter((s) => s.date.slice(0, 10) === today).length;
+  const today = toLocalDateString();
+  return loadSessions().filter((s) => toLocalDateString(s.date) === today).length;
 }
 
 export const loadNum = (key: string, def: number) => {
