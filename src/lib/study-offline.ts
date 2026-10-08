@@ -1,271 +1,836 @@
 import type { StudyItem } from "./study.functions";
 
-// Banco offline: usado quando a IA está indisponível (sem créditos, sem conexão).
-const BANK: { area: string; item: StudyItem }[] = [
+// Mega-banco offline: viradas de chave práticas de alta incidência nas provas da OAB (FGV)
+// Usado quando a IA está indisponível (sem créditos, offline).
+export const BANK: { area: string; item: StudyItem }[] = [
   {
-    area: "processual civil",
-    item: {
-      linha: "o juiz homologou os cálculos e extinguiu a execução por sentença",
-      termo: "sentença",
-      semantica:
-        "Pronunciamento que, com fundamento nos arts. 485 ou 487 do CPC, põe fim à fase cognitiva ou extingue a execução (art. 203, §1º).",
-      virada: {
-        titulo: "Natureza do ato judicial",
-        raciocinio:
-          "A natureza de um ato judicial é definida pelo seu conteúdo (arts. 485/487 do CPC) e pela sua finalidade, jamais pelo nome que o juiz lhe deu.",
-        exemplo:
-          '"Despacho: homologo os cálculos e dou por satisfeita a execução." Não é despacho, é sentença: cabe apelação. Quem agrava perde o prazo da apelação.',
-      },
-    },
-  },
-  {
-    area: "processual civil",
-    item: {
-      linha: "os prazos processuais contam apenas os dias úteis no novo código",
-      termo: "prazo processual",
-      semantica:
-        "Lapso temporal para a prática de ato no processo; no CPC conta-se em dias úteis (art. 219).",
-      virada: {
-        titulo: "Prazo processual x prazo material",
-        raciocinio:
-          "O art. 219 do CPC só se aplica a prazos processuais. Prazos de direito material, como decadência e prescrição, correm em dias corridos.",
-        exemplo:
-          "O advogado conta em dias úteis os 120 dias do mandado de segurança (prazo decadencial, art. 23 da Lei 12.016) e impetra fora do prazo.",
-      },
-    },
-  },
-  {
-    area: "processual civil",
-    item: {
-      linha: "os embargos de declaração interrompem o prazo para outros recursos",
-      termo: "embargos de declaração",
-      semantica:
-        "Recurso para sanar omissão, contradição, obscuridade ou erro material da decisão (art. 1.022 do CPC).",
-      virada: {
-        titulo: "Interrupção, não suspensão",
-        raciocinio:
-          "Embargos de declaração interrompem o prazo dos demais recursos (art. 1.026 do CPC): ele recomeça do zero. Desde 2015, isso vale também nos Juizados (art. 50 da Lei 9.099).",
-        exemplo:
-          "O advogado calcula só o saldo restante após os embargos e interpõe a apelação com dias de sobra que não precisava ter descartado — ou pior, acha que perdeu o prazo e desiste.",
-      },
-    },
-  },
-  {
-    area: "penal",
-    item: {
-      linha: "a atenuante não conduz a pena abaixo do mínimo legal na segunda fase",
-      termo: "atenuante",
-      semantica:
-        "Circunstância legal que reduz a pena na segunda fase da dosimetria (arts. 65 e 66 do CP).",
-      virada: {
-        titulo: "Súmula 231 do STJ",
-        raciocinio:
-          "Na segunda fase, atenuantes não podem levar a pena abaixo do mínimo legal. Só as causas de diminuição (terceira fase) rompem o mínimo.",
-        exemplo:
-          "A defesa pede pena abaixo do mínimo pela confissão. Indeferido: o pedido correto era buscar uma minorante, como a tentativa ou o tráfico privilegiado.",
-      },
-    },
-  },
-  {
-    area: "processual penal",
-    item: {
-      linha: "no processo penal o prazo corre da intimação e não da juntada",
-      termo: "intimação",
-      semantica: "Ato de comunicação que dá ciência à parte de ato ou termo do processo.",
-      virada: {
-        titulo: "Súmula 710 do STF",
-        raciocinio:
-          "No processo penal, os prazos contam da data da intimação, e não da juntada aos autos do mandado ou carta precatória, ao contrário do processo civil.",
-        exemplo:
-          "O advogado acostumado ao CPC espera a juntada do mandado para contar o prazo da apelação criminal e o recurso é declarado intempestivo.",
-      },
-    },
-  },
-  {
-    area: "constitucional",
-    item: {
-      linha: "o governador precisa demonstrar pertinência temática na ação direta",
-      termo: "pertinência temática",
-      semantica:
-        "Relação entre o objeto da ação de controle concentrado e os interesses institucionais do legitimado.",
-      virada: {
-        titulo: "Legitimados especiais (art. 103 da CF)",
-        raciocinio:
-          "Mesa de Assembleia, Governador, confederação sindical e entidade de classe de âmbito nacional são legitimados especiais e devem demonstrar pertinência temática. Os demais são universais.",
-        exemplo:
-          "Uma confederação sindical ajuíza ADI contra lei que não afeta sua categoria: a ação não é conhecida por falta de pertinência temática.",
-      },
-    },
-  },
-  {
-    area: "tributário",
-    item: {
-      linha: "a declaração do contribuinte constitui o crédito tributário declarado",
-      termo: "crédito tributário",
-      semantica:
-        "Relação jurídica que confere ao Fisco o direito de exigir o tributo, constituída pelo lançamento (art. 142 do CTN).",
-      virada: {
-        titulo: "Súmula 436 do STJ",
-        raciocinio:
-          "A entrega da declaração reconhecendo o débito constitui o crédito, dispensando lançamento. A partir daí não se fala mais em decadência, mas em prescrição.",
-        exemplo:
-          "A defesa alega decadência de tributo declarado e não pago há seis anos. Tese errada: o correto é discutir prescrição, contada do vencimento ou da entrega.",
-      },
-    },
-  },
-  {
-    area: "administrativo",
-    item: {
-      linha: "o ressarcimento ao erário por improbidade dolosa é imprescritível",
-      termo: "imprescritibilidade",
-      semantica: "Qualidade da pretensão que não se extingue pelo decurso do tempo.",
-      virada: {
-        titulo: "Tema 897 do STF",
-        raciocinio:
-          "São imprescritíveis as ações de ressarcimento ao erário fundadas em ato doloso de improbidade. Para ilícitos civis comuns, há prescrição (Tema 666).",
-        exemplo:
-          "O advogado alega prescrição quinquenal contra cobrança de dano ao erário por fraude dolosa em licitação. A tese é rejeitada de plano.",
-      },
-    },
-  },
-  {
-    area: "civil",
-    item: {
-      linha: "os juros de mora fluem desde o evento danoso na responsabilidade extracontratual",
-      termo: "juros moratórios",
-      semantica: "Remuneração devida pelo atraso no cumprimento da obrigação.",
-      virada: {
-        titulo: "Súmulas 54 e 362 do STJ",
-        raciocinio:
-          "No ilícito extracontratual, juros correm do evento danoso (Súm. 54). A correção do dano moral corre do arbitramento (Súm. 362). No contratual, juros correm da citação.",
-        exemplo:
-          "Em acidente de trânsito, o advogado pede juros a partir da citação e perde anos de juros que eram devidos desde o acidente.",
-      },
-    },
-  },
-  {
-    area: "trabalho",
-    item: {
-      linha: "a prescrição trabalhista é bienal após a extinção do contrato",
-      termo: "prescrição bienal",
-      semantica:
-        "Prazo de dois anos após a extinção do contrato para ajuizar a reclamação (art. 7º, XXIX, da CF).",
-      virada: {
-        titulo: "Bienal + quinquenal",
-        raciocinio:
-          "Há dois filtros: a ação deve ser proposta até dois anos após o fim do contrato, e só alcança os cinco anos anteriores ao ajuizamento, não à rescisão.",
-        exemplo:
-          "O empregado espera 23 meses para ajuizar: a ação é tempestiva, mas perde quase dois anos de verbas, pois os cinco anos contam do ajuizamento.",
-      },
-    },
-  },
-  {
-    area: "processual do trabalho",
-    item: {
-      linha: "sem o depósito recursal o recurso ordinário será considerado deserto",
-      termo: "deserção",
-      semantica: "Inadmissibilidade do recurso pela falta ou insuficiência do preparo.",
-      virada: {
-        titulo: "Depósito recursal (art. 899 da CLT)",
-        raciocinio:
-          "O depósito recursal garante o juízo e é pressuposto do recurso do empregador. Ele deve ser comprovado no prazo do recurso.",
-        exemplo:
-          "A empresa recorre e junta o comprovante do depósito dias depois do prazo: recurso deserto, condenação mantida.",
-      },
-    },
-  },
-  {
-    area: "consumidor",
-    item: {
-      linha: "o consumidor tem noventa dias para reclamar de vício em produto durável",
-      termo: "vício do produto",
-      semantica:
-        "Defeito que torna o produto impróprio ou diminui seu valor, sem necessariamente causar dano à segurança.",
-      virada: {
-        titulo: "Vício (art. 26) x fato do produto (art. 27)",
-        raciocinio:
-          "Vício gera prazo decadencial de 30 ou 90 dias. Acidente de consumo (fato do produto) gera prazo prescricional de cinco anos.",
-        exemplo:
-          "A geladeira explode e fere o consumidor seis meses depois. Não houve decadência: é fato do produto, com cinco anos para a ação.",
-      },
-    },
-  },
-  {
-    area: "empresarial",
-    item: {
-      linha: "a desconsideração da personalidade jurídica exige abuso comprovado",
-      termo: "desconsideração",
-      semantica:
-        "Afastamento episódico da autonomia patrimonial da pessoa jurídica para atingir bens dos sócios.",
-      virada: {
-        titulo: "Teoria maior x teoria menor",
-        raciocinio:
-          "No Código Civil (art. 50) exige-se desvio de finalidade ou confusão patrimonial. No CDC (art. 28, §5º) basta que a personalidade seja obstáculo ao ressarcimento.",
-        exemplo:
-          "Em execução cível comum, o credor pede desconsideração só por insolvência da empresa. Indeferido: sem abuso, não se aplica o art. 50.",
-      },
+    area: "ética",
+    linha: "a advocacia pro bono veda a captação de clientela ou cobrança futura",
+    termo: "advocacia pro bono",
+    semantica:
+      "Prestação gratuita, eventual e voluntária de serviços jurídicos a pessoas físicas sem recursos ou entidades sem fins lucrativos (art. 30 do CED).",
+    virada: {
+      titulo: "Vedação à captação em pro bono",
+      raciocinio:
+        "O advogado pro bono não pode prestar serviços remunerados para a mesma entidade ou beneficiário no período de 3 anos, nem vincular a gratuidade à captação de clientes.",
+      exemplo:
+        "Advogado atende gratuitamente sindicato em litígio coletivo e depois oferece assessoria trabalhista privada aos sindicalizados: infração ética direta.",
     },
   },
   {
     area: "ética",
-    item: {
-      linha: "os honorários de sucumbência pertencem ao advogado e não à parte",
-      termo: "honorários sucumbenciais",
-      semantica: "Verba fixada na sentença em favor do advogado do vencedor (art. 85 do CPC).",
-      virada: {
-        titulo: "Art. 23 do Estatuto da OAB",
-        raciocinio:
-          "Os honorários de sucumbência pertencem ao advogado, que pode executá-los autonomamente. Têm natureza alimentar (Súmula Vinculante 47).",
-        exemplo:
-          "O cliente faz acordo e renuncia aos honorários sucumbenciais do advogado. A renúncia não atinge o advogado, que pode cobrá-los.",
-      },
+    linha: "os honorários sucumbenciais pertencem ao advogado e têm caráter alimentar",
+    termo: "honorários sucumbenciais",
+    semantica:
+      "Verba fixada na sentença judicial devida pela parte vencida ao patrono da parte vencedora (art. 85 do CPC e art. 23 do EAOAB).",
+    virada: {
+      titulo: "Autonomia dos honorários sucumbenciais",
+      raciocinio:
+        "A transação ou acordo celebrado entre as partes sem anuência do advogado não pode dispensar nem renunciar aos honorários sucumbenciais (Súmula Vinculante 47 e art. 24, §4º do EAOAB).",
+      exemplo:
+        "Autor e réu fazem acordo extrajudicial e declaram quitação geral mútua; o advogado do autor segue com direito autônomo de executar a sucumbência fixada.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "o advogado detém imunidade por injúria e difamação em juízo",
+    termo: "imunidade profissional",
+    semantica:
+      "Garantia legal que assegura inviolabilidade por atos e manifestações no exercício da profissão (art. 7º, §2º do EAOAB).",
+    virada: {
+      titulo: "Limites da imunidade penal",
+      raciocinio:
+        "A imunidade profissional cobre apenas injúria e difamação praticadas em debate judicial ou na profissão. Jamais cobre desacato ou calúnia (ADI 1.127 do STF).",
+      exemplo:
+        "Em contestação acalorada, o advogado imputa falsamente crime de corrupção ao magistrado: responde pelo crime de calúnia sem qualquer imunidade.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "a incompatibilidade proíbe o exercício total e o impedimento o parcial",
+    termo: "incompatibilidade x impedimento",
+    semantica:
+      "Limitações ao exercício da advocacia previstas nos arts. 28 e 30 do Estatuto da Advocacia.",
+    virada: {
+      titulo: "Distinção entre art. 28 e 30",
+      raciocinio:
+        "Incompatibilidade gera proibição total de advogar (ex: policial, juiz, gerente de banco). Impedimento gera vedação apenas contra o órgão que o remunera (servidor público em geral).",
+      exemplo:
+        "Analista administrativo do TJ não pode advogar contra a Fazenda Pública Estadual, mas pode advogar em varas de família contra particulares.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "a prisão de advogado antes do trânsito exige sala de estado maior",
+    termo: "sala de estado maior",
+    semantica:
+      "Prerrogativa profissional consistente em dependência com instalações condignas sem grades nem celas comuns (art. 7º, IV do EAOAB).",
+    virada: {
+      titulo: "Prisão cautelar de advogado",
+      raciocinio:
+        "Antes do trânsito em julgado da condenação, o advogado tem direito a sala de estado maior. Na sua falta comprovada, a conversão em prisão domiciliar é imperativa.",
+      exemplo:
+        "Advogado preso preventivamente é colocado em cela separada no presídio comum com grade: cabe habeas corpus para imediata remoção para domiciliar.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "a publicidade na advocacia é meramente informativa e sem mercantilização",
+    termo: "publicidade sóbria",
+    semantica:
+      "Diretrizes de comunicação profissional estabelecidas no Código de Ética e no Provimento 205/2021 da OAB.",
+    virada: {
+      titulo: "Marketing jurídico permitido",
+      raciocinio:
+        "É lícito o impulsionamento de posts informativos nas redes sociais, mas são expressamente proibidos anúncios em rádio, TV, cinema ou outdoors, bem como promessas de resultado.",
+      exemplo:
+        "Escritório coloca placa em outdoor anunciando 'especialistas em aposentadoria rápida': comete infração disciplinar passível de censura.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "a retenção abusiva de autos por advogado enseja suspensão disciplinar",
+    termo: "retenção de autos",
+    semantica:
+      "Retenção indevida de processo físico ou recusa em devolver autos com prazo excedido (art. 34, XXII do EAOAB).",
+    virada: {
+      titulo: "Sanção da retenção de autos",
+      raciocinio:
+        "Após formalmente intimado para devolver os autos em cartório e não o fazendo, o advogado comete infração sujeita a sanção disciplinar de suspensão, e não mera censura.",
+      exemplo:
+        "Advogado mantém autos por 6 meses para forçar adiamento de audiência e ignora mandado de busca e apreensão: é suspenso preventivamente pelo Tribunal de Ética.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "o prazo prescricional da ação de cobrança de honorários é de cinco anos",
+    termo: "prescrição de honorários",
+    semantica:
+      "Prazo para pretensão de cobrança judicial de honorários convencionados ou arbitrados (art. 25 do EAOAB).",
+    virada: {
+      titulo: "Termo inicial da cobrança",
+      raciocinio:
+        "O prazo de 5 anos conta do vencimento do contrato, do trânsito em julgado da decisão que os fixar, ou da revogação do mandato.",
+      exemplo:
+        "Cliente revoga a procuração unilateralmente: os 5 anos para cobrar o trabalho proporcional correm da data da notificação da revogação.",
+    },
+  },
+  {
+    area: "ética",
+    linha: "o estagiário só pode praticar atos judiciais em conjunto com advogado",
+    termo: "atos de estagiário",
+    semantica:
+      "Atuação permitida ao estudante de Direito inscrito na OAB sob supervisão profissional (art. 3º, §2º do EAOAB).",
+    virada: {
+      titulo: "Atos isolados de estagiário",
+      raciocinio:
+        "O estagiário só pode atuar isoladamente para retirar autos em cartório e obter certidões. Petições, audiências e recursos exigem assinatura conjunta do advogado.",
+      exemplo:
+        "Estagiário comparece sozinho à audiência de instrução e subscreve termo sem advogado: o ato é nulo e o estagiário comete exercício ilegal da profissão.",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "a ação direta de inconstitucionalidade não admite intervenção de terceiros",
+    termo: "amigo da corte",
+    semantica:
+      "Órgão ou entidade que intervém no processo de controle abstrato para prestar subsídios técnicos (art. 7º da Lei 9.868/99).",
+    virada: {
+      titulo: "Terceiros no controle concentrado",
+      raciocinio:
+        "Em ADI não cabe assistência, oposição ou litisconsórcio. Apenas é admitida a figura do amicus curiae por decisão irrecorrível do relator.",
+      exemplo:
+        "Associação comercial requer ingresso como assistente simples do Procurador-Geral da República em ADI: pedido é liminarmente indeferido.",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "o mandado de segurança possui prazo decadencial de cento e vinte dias",
+    termo: "decadência no ms",
+    semantica:
+      "Extinção do direito de requerer mandado de segurança pela inércia temporal (art. 23 da Lei 12.016/2009).",
+    virada: {
+      titulo: "Prazo decadencial improrrogável",
+      raciocinio:
+        "O prazo de 120 dias é de decadência material: conta-se em dias corridos da ciência do ato e não se suspende nem se interrompe por pedido de reconsideração administrativa.",
+      exemplo:
+        "Servidor protocola pedido de reconsideração no 100º dia e impetra MS no 130º dia: o mandado é extinto pela decadência (Súmula 430 do STF).",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "a cláusula de reserva de plenário veda decisão por órgão fracionário",
+    termo: "reserva de plenário",
+    semantica:
+      "Regra do art. 97 da CF segundo a qual apenas a maioria absoluta do plenário ou órgão especial do tribunal pode declarar inconstitucionalidade de lei.",
+    virada: {
+      titulo: "Súmula Vinculante 10",
+      raciocinio:
+        "Viola a cláusula de reserva de plenário a decisão de câmara ou turma que, embora não declare expressamente a inconstitucionalidade, afasta a incidência de lei no caso concreto.",
+      exemplo:
+        "Câmara cível de TJ deixa de aplicar artigo de lei por considerá-lo incompatível com a CF sem remeter ao Órgão Especial: decisão nula por violar a SV 10.",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "a ação popular é isenta de custas salvo comprovada má-fé do autor",
+    termo: "ação popular",
+    semantica:
+      "Remédio constitucional destinado a anular ato lesivo ao patrimônio público, moralidade, meio ambiente ou patrimônio histórico (art. 5º, LXXIII da CF).",
+    virada: {
+      titulo: "Gratuidade da ação popular",
+      raciocinio:
+        "O cidadão autor da ação popular não paga custas judiciais nem sucumbência, exceto se comprovada má-fé no ajuizamento temeroso.",
+      exemplo:
+        "Cidadão perde ação popular contra prefeito: o juiz não pode condená-lo em honorários de sucumbência se não houver prova de má-fé.",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "a comissão parlamentar de inquérito não pode decretar prisão preventiva",
+    termo: "poderes de cpi",
+    semantica: "Poderes instrutórios conferidos a comissões parlamentares no art. 58, §3º da CF.",
+    virada: {
+      titulo: "Reserva de jurisdição na CPI",
+      raciocinio:
+        "CPI tem poderes instrutórios de juiz para quebra de sigilo fiscal, bancário e telefônico, mas não pode ordenar interceptação telefônica (escuta), busca domiciliar nem prisão cautelar.",
+      exemplo:
+        "CPI determina prisão preventiva de investigado por risco de fuga: ordem manifestamente nula, passível de trancamento imediato por habeas corpus no STF.",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "o habeas corpus e o habeas data são gratuitos na ordem constitucional",
+    termo: "remédios gratuitos",
+    semantica:
+      "Ações constitucionais com isenção ampla de emolumentos e taxas judiciárias garantidas pelo art. 5º, LXXVII da CF.",
+    virada: {
+      titulo: "Gratuidade constitucional",
+      raciocinio:
+        "Habeas Corpus e Habeas Data são gratuitos por expressa previsão constitucional, independente de o impetrante demonstrar pobreza ou hipossuficiência.",
+      exemplo:
+        "Tribunal exige recolhimento de preparo recursal para apelação em Habeas Data: exigência inconstitucional que ofende o art. 5º, LXXVII.",
+    },
+  },
+  {
+    area: "constitucional",
+    linha: "os tratados de direitos humanos aprovados em dois turnos têm força de emenda",
+    termo: "status dos tratados",
+    semantica:
+      "Equiparação dos tratados internacionais sobre direitos humanos às emendas à Constituição (art. 5º, §3º da CF).",
+    virada: {
+      titulo: "Tratados de direitos humanos",
+      raciocinio:
+        "Se aprovados por 3/5 dos votos em 2 turnos nas duas Casas, equivalem a Emenda Constitucional. Se aprovados pelo rito ordinário, têm status supralegal (RE 466.343).",
+      exemplo:
+        "Pacto de San José da Costa Rica aprovado pelo rito comum revoga eficácia de leis ordinárias infraconstitucionais contrárias, como a prisão do depositário infiel (SV 25).",
+    },
+  },
+  {
+    area: "processual civil",
+    linha: "o agravo de instrumento possui taxatividade mitigada em caso de urgência",
+    termo: "taxatividade mitigada",
+    semantica:
+      "Tese fixada pelo STJ no Tema 988 dos Recursos Repetitivos sobre o rol do art. 1.015 do CPC.",
+    virada: {
+      titulo: "Tema 988 do STJ",
+      raciocinio:
+        "O rol do art. 1.015 é de taxatividade mitigada: cabe agravo de instrumento fora das hipóteses legais quando demonstrada urgência decorrente da inutilidade do julgamento na apelação.",
+      exemplo:
+        "Decisão interlocutória rejeita segredo de justiça ou competência territorial: o agravo é cabível de imediato porque esperar a apelação tornaria o prejuízo irreversível.",
+    },
+  },
+  {
+    area: "processual civil",
+    linha: "o julgamento antecipado parcial de mérito desafia agravo de instrumento",
+    termo: "decisão parcial de mérito",
+    semantica:
+      "Pronunciamento judicial que julga definitivamente parte dos pedidos incontroversos ou maduros (art. 356 do CPC).",
+    virada: {
+      titulo: "Recurso no julgamento parcial",
+      raciocinio:
+        "A decisão que resolve parte do mérito é interlocutória e não extingue o processo: o recurso cabível é o agravo de instrumento, jamais a apelação.",
+      exemplo:
+        "Advogado interpõe apelação contra decisão que julgou antecipadamente um dos três pedidos cumulados: o recurso não é conhecido por erro grosseiro sem fungibilidade.",
+    },
+  },
+  {
+    area: "processual civil",
+    linha: "os embargos de declaração interrompem o prazo para os demais recursos",
+    termo: "interrupção recursal",
+    semantica:
+      "Efeito do art. 1.026 do CPC que zera e reinicia integralmente a contagem de prazo para os outros recursos cabíveis.",
+    virada: {
+      titulo: "Interrupção, não suspensão",
+      raciocinio:
+        "Os embargos de declaração interrompem o prazo recursal: ele recomeça do zero para ambas as partes após a intimação da decisão dos embargos.",
+      exemplo:
+        "No 10º dia do prazo da apelação, a parte opõe embargos de declaração: após julgados os embargos, o prazo de apelação recomeça do primeiro dia inteiro (15 dias úteis).",
+    },
+  },
+  {
+    area: "processual civil",
+    linha: "a gratuidade da justiça opera efeitos ex nunc e não retroage",
+    termo: "efeitos da gratuidade",
+    semantica:
+      "Regime temporal da concessão do benefício da assistência judiciária gratuita no CPC (art. 99).",
+    virada: {
+      titulo: "Não retroatividade da justiça gratuita",
+      raciocinio:
+        "O deferimento de gratuidade tem eficácia prospectiva (ex nunc): não isenta a parte de arcar com custas preexistentes ou sucumbência fixada em fase anterior.",
+      exemplo:
+        "Parte obtém justiça gratuita no tribunal ao interpor apelação: a concessão não cancela as custas iniciais e honorários de fases anteriores pendentes.",
+    },
+  },
+  {
+    area: "processual civil",
+    linha: "o cumprimento de sentença impõe multa de dez por cento se não pago no prazo",
+    termo: "multa do art. 523",
+    semantica:
+      "Penalidade legal pelo não pagamento voluntário da condenação líquida em 15 dias úteis (art. 523, §1º do CPC).",
+    virada: {
+      titulo: "Multa e honorários da fase de cumprimento",
+      raciocinio:
+        "Decorrido o prazo de 15 dias sem pagamento voluntário, incidem automaticamente 10% de multa e mais 10% de honorários advocatícios sobre o débito exequendo.",
+      exemplo:
+        "Devedor oferece bens à penhora no 15º dia em vez de depositar o dinheiro: incidem a multa de 10% e honorários de 10%, pois penhora não é pagamento voluntário.",
+    },
+  },
+  {
+    area: "civil",
+    linha: "a desconsideração da personalidade jurídica no código civil adota a teoria maior",
+    termo: "teoria maior",
+    semantica:
+      "Requisitos estritos do art. 50 do Código Civil para afastar episodicamente a autonomia patrimonial da pessoa jurídica.",
+    virada: {
+      titulo: "Teoria maior x teoria menor",
+      raciocinio:
+        "No Código Civil (art. 50) exige-se prova de desvio de finalidade ou confusão patrimonial. No CDC (art. 28, §5º) basta o mero inadimplemento (teoria menor).",
+      exemplo:
+        "Em execução cível contratual, credor pede desconsideração apenas porque a empresa não tem saldo bancário: pedido é indeferido pela falta de prova de abuso.",
+    },
+  },
+  {
+    area: "civil",
+    linha: "a obrigação de prestar alimentos é irrepetível e incompensável",
+    termo: "irrepetibilidade dos alimentos",
+    semantica:
+      "Princípio protetivo da subsistência humana que veda devolução de valores alimentares pagos indevidamente (art. 1.707 do CC).",
+    virada: {
+      titulo: "Irrepetibilidade alimentar",
+      raciocinio:
+        "Mesmo que ação de exoneração julgue procedente o pedido ou que exame de DNA prove ausência de paternidade, o alimentante não tem direito a ressarcimento dos alimentos pagos.",
+      exemplo:
+        "Pai paga alimentos por 5 anos e descobre que não é o pai biológico: não pode exigir da criança nem da mãe a devolução das parcelas já consumidas.",
+    },
+  },
+  {
+    area: "civil",
+    linha: "os juros de mora fluem do evento danoso na responsabilidade extracontratual",
+    termo: "juros extracontratuais",
+    semantica:
+      "Termo inicial da mora em ilícitos civis extracontratuais segundo a Súmula 54 do STJ e art. 398 do CC.",
+    virada: {
+      titulo: "Súmula 54 do STJ",
+      raciocinio:
+        "Na responsabilidade extracontratual, os juros de mora fluem a partir do evento danoso. Já no dano contratual, fluem a partir da citação (art. 405 do CC).",
+      exemplo:
+        "Vítima de atropelamento ajuíza ação após 2 anos: os juros de mora sobre os danos materiais e estéticos retroagem ao dia exato do atropelamento.",
+    },
+  },
+  {
+    area: "civil",
+    linha: "a correção monetária do dano moral incide desde a data do arbitramento",
+    termo: "correção do dano moral",
+    semantica:
+      "Momento a partir do qual a indenização por abalo moral é monetariamente atualizada (Súmula 362 do STJ).",
+    virada: {
+      titulo: "Súmula 362 do STJ",
+      raciocinio:
+        "A correção monetária do valor da indenização do dano moral incide desde a data da sentença ou acórdão que a arbitrar, e não do ajuizamento da petição inicial.",
+      exemplo:
+        "Sentença fixa R$ 20.000 de dano moral: a atualização monetária conta da data da publicação da sentença, mas os juros de mora correm do evento (Súmula 54).",
+    },
+  },
+  {
+    area: "civil",
+    linha: "a prescrição atinge a pretensão e a decadência extingue o próprio direito",
+    termo: "prescrição x decadência",
+    semantica:
+      "Conceitos fundamentais de perecimento temporal de direitos nos arts. 189 a 211 do Código Civil.",
+    virada: {
+      titulo: "Critério de Agnelo Amorim",
+      raciocinio:
+        "Ações condenatórias estão sujeitas à prescrição (atinge a pretensão). Ações constitutivas sujeitam-se à decadência. Ações puramente declaratórias são perpétuas/imprescritíveis.",
+      exemplo:
+        "Ação anulatória de negócio jurídico por erro ou coação é constitutiva: sujeita-se a prazo decadencial de 4 anos (art. 178 do CC), que não se interrompe.",
+    },
+  },
+  {
+    area: "penal",
+    linha: "a atenuante na segunda fase não pode conduzir a pena aquém do mínimo legal",
+    termo: "súmula 231 stj",
+    semantica:
+      "Baliza consolidada da dosimetria da pena no sistema trifásico (art. 68 do Código Penal).",
+    virada: {
+      titulo: "Súmula 231 do STJ",
+      raciocinio:
+        "Na segunda fase da dosimetria, atenuantes genéricas (como confissão espontânea ou menoridade relativa) não podem reduzir a pena aquém do mínimo cominado em abstrato.",
+      exemplo:
+        "Réu confessa furto simples cuja pena mínima é 1 ano: a pena-base fixada no mínimo não pode sofrer redução para 8 meses na segunda fase.",
+    },
+  },
+  {
+    area: "penal",
+    linha:
+      "na desistência voluntária e no arrependimento eficaz o agente responde pelos atos praticados",
+    termo: "tentativa abandonada",
+    semantica:
+      "Institutos do art. 15 do Código Penal que excluem a tipicidade da tentativa original.",
+    virada: {
+      titulo: "Ponte de ouro (art. 15 CP)",
+      raciocinio:
+        "Quem desiste voluntariamente de prosseguir na execução ou impede eficazmente o resultado não responde por tentativa do crime pretendido, apenas pelos atos já consumados.",
+      exemplo:
+        "Agente atira na vítima para matar mas desiste e a socorre para o hospital evitando a morte: não responde por tentativa de homicídio, apenas por lesão corporal culposa/dolosa.",
+    },
+  },
+  {
+    area: "penal",
+    linha: "o arrependimento posterior exige crime sem violência ou grave ameaça à pessoa",
+    termo: "arrependimento posterior",
+    semantica:
+      "Causa de diminuição de pena prevista no art. 16 do Código Penal para reparação do dano.",
+    virada: {
+      titulo: "Requisitos do art. 16 do CP",
+      raciocinio:
+        "Exige 4 requisitos cumulativos: crime sem violência ou grave ameaça, reparação integral da coisa por ato voluntário e realizada antes do recebimento da denúncia ou queixa.",
+      exemplo:
+        "Autor de estelionato devolve todo o dinheiro à vítima antes da denúncia: tem direito subjetivo à redução de um a dois terços da pena.",
+    },
+  },
+  {
+    area: "penal",
+    linha: "o erro de tipo exclui o dolo e o erro de proibição isenta de pena se inevitável",
+    termo: "erro de tipo x erro de proibição",
+    semantica: "Consequências jurídicas dos erros previstos nos arts. 20 e 21 do Código Penal.",
+    virada: {
+      titulo: "Dolo x Culpabilidade",
+      raciocinio:
+        "Erro de tipo incide sobre elementos do fato (exclui o dolo, permitindo punição culposa se prevista). Erro de proibição incide sobre a ilicitude da conduta (isenta a pena por inexigibilidade de consciência).",
+      exemplo:
+        "Caçador atira em arbusto acreditando ser animal e atinge homem: erro de tipo essencial (exclui dolo de matar, responde por homicídio culposo).",
+    },
+  },
+  {
+    area: "penal",
+    linha: "o princípio da insignificância é inaplicável aos crimes de violência doméstica",
+    termo: "súmula 589 stj",
+    semantica:
+      "Jurisprudência pacificada nos crimes cometidos contra a mulher no âmbito doméstico e familiar.",
+    virada: {
+      titulo: "Súmula 589 do STJ",
+      raciocinio:
+        "É inaplicável o princípio da insignificância aos crimes e contravenções penais praticados com violência ou grave ameaça contra a mulher no ambiente doméstico.",
+      exemplo:
+        "Marido empurra a esposa causando arranhão leve e alega bagatela penal: a tese é sumariamente rejeitada com base na Súmula 589.",
+    },
+  },
+  {
+    area: "processual penal",
+    linha: "no processo penal a contagem recursal flui da intimação e não da juntada",
+    termo: "súmula 710 stf",
+    semantica: "Regra temporal estrita da contagem de prazos recursais penais (art. 798 do CPP).",
+    virada: {
+      titulo: "Súmula 710 do STF",
+      raciocinio:
+        "No processo penal, o prazo recursal conta da data da intimação pessoal ou publicação, e jamais da juntada aos autos do mandado ou carta precatória.",
+      exemplo:
+        "Advogado aguarda a certidão de juntada do mandado de intimação para apelar no 5º dia: apelação intempestiva porque o prazo correu da intimação física.",
+    },
+  },
+  {
+    area: "processual penal",
+    linha: "o juiz não pode decretar prisão preventiva de ofício em nenhuma fase",
+    termo: "vedação de prisão de ofício",
+    semantica:
+      "Consagração do sistema acusatório promovida pelo Pacote Anticrime (art. 311 do CPP).",
+    virada: {
+      titulo: "Sistema acusatório no CPP",
+      raciocinio:
+        "Tanto na fase investigativa quanto na instrução processual, a decretação de prisão preventiva depende obrigatoriamente de requerimento do MP ou representação da autoridade policial.",
+      exemplo:
+        "Durante audiência, réu ameaça testemunha e o juiz decreta a preventiva espontaneamente sem pedido do promotor: ato ilegal que gera concessão de habeas corpus.",
+    },
+  },
+  {
+    area: "processual penal",
+    linha: "o delegado de polícia não pode mandar arquivar autos de inquérito policial",
+    termo: "indisponibilidade do inquérito",
+    semantica:
+      "Princípio da indisponibilidade processual atribuído à autoridade policial no art. 17 do CPP.",
+    virada: {
+      titulo: "Art. 17 do CPP",
+      raciocinio:
+        "A autoridade policial não tem competência para determinar o arquivamento de inquérito, ainda que convença-se da atipicidade manifesta do fato.",
+      exemplo:
+        "Delegado encerra inquérito e despacha determinando seu arquivamento direto na delegacia: ato nulo, os autos devem ser remetidos ao juízo/MP.",
+    },
+  },
+  {
+    area: "processual penal",
+    linha: "a ampla defesa assegura acesso aos elementos já documentados em inquérito",
+    termo: "súmula vinculante 14",
+    semantica:
+      "Prerrogativa do defensor de consultar autos investigativos perante a autoridade policial.",
+    virada: {
+      titulo: "Súmula Vinculante 14 do STF",
+      raciocinio:
+        "É direito do defensor ter acesso amplo aos elementos de prova que já estiverem documentados e juntados aos autos. Diligências em andamento podem permanecer sob sigilo.",
+      exemplo:
+        "Delegado nega ao advogado acesso ao relatório de interceptações telefônicas já encerradas: viola a SV 14 e autoriza reclamação constitucional no STF.",
+    },
+  },
+  {
+    area: "trabalho",
+    linha: "a prescrição trabalhista impõe limite bienal e marco quinquenal do ajuizamento",
+    termo: "prescrição bienal e quinquenal",
+    semantica:
+      "Regime constitucional da prescrição trabalhista no art. 7º, XXIX da CF e art. 11 da CLT.",
+    virada: {
+      titulo: "Marco do ajuizamento",
+      raciocinio:
+        "O empregado tem 2 anos após a rescisão para ajuizar a ação, mas a prescrição quinquenal retroage 5 anos a contar da data da petição inicial, e não da data da demissão.",
+      exemplo:
+        "Trabalhador espera 1 ano e 11 meses para ajuizar ação: a ação é tempestiva, mas ele perdeu quase 2 anos de créditos anteriores em razão do marco do ajuizamento.",
+    },
+  },
+  {
+    area: "trabalho",
+    linha: "a mera identidade de sócios não caracteriza grupo econômico trabalhista",
+    termo: "grupo econômico",
+    semantica:
+      "Requisitos de responsabilização solidária empresarial introduzidos no art. 2º, §3º da CLT pela Reforma Trabalhista.",
+    virada: {
+      titulo: "Art. 2º, §3º da CLT",
+      raciocinio:
+        "Não caracteriza grupo econômico a mera identidade de sócios: exige-se demonstração de interesse integrado, comunhão de interesses e atuação conjunta das empresas.",
+      exemplo:
+        "Reclamante pede inclusão de segunda empresa só porque ela tem um sócio em comum com a devedora: pedido indeferido sem prova de coordenação interempresarial.",
+    },
+  },
+  {
+    area: "trabalho",
+    linha: "o tempo de deslocamento até o local de trabalho não gera horas in itinere",
+    termo: "horas in itinere",
+    semantica:
+      "Alteração da CLT pelo art. 58, §2º que afastou o cômputo do tempo de transporte como jornada.",
+    virada: {
+      titulo: "Extinção das horas in itinere",
+      raciocinio:
+        "O tempo despendido pelo empregado até o local de trabalho e para o seu retorno, por qualquer meio de transporte (mesmo fornecido pelo empregador), não é computado na jornada.",
+      exemplo:
+        "Empregado viaja 2 horas em ônibus fretado da mineradora até mina de difícil acesso: não tem direito a horas extras de deslocamento.",
+    },
+  },
+  {
+    area: "trabalho",
+    linha: "a terceirização é lícita em qualquer atividade com responsabilidade subsidiária",
+    termo: "terceirização ampla",
+    semantica: "Tese vinculante fixada pelo STF no Tema 725 da repercussão geral.",
+    virada: {
+      titulo: "Tema 725 do STF",
+      raciocinio:
+        "É lícita a terceirização de qualquer atividade da empresa tomadora, seja meio ou fim. A tomadora responde de forma subsidiária pelo inadimplemento trabalhista.",
+      exemplo:
+        "Banco terceiriza operadores de caixa e gerentes: não gera vínculo direto com o banco, remanescendo apenas responsabilidade subsidiária da instituição financeira.",
+    },
+  },
+  {
+    area: "processual do trabalho",
+    linha: "o depósito recursal é inexigível de beneficiário da justiça gratuita",
+    termo: "isenção de depósito",
+    semantica: "Regra de acesso à justiça trabalhista positivada no art. 899, §10 da CLT.",
+    virada: {
+      titulo: "Art. 899, §10 da CLT",
+      raciocinio:
+        "São isentos do recolhimento de depósito recursal os beneficiários da justiça gratuita, as entidades filantrópicas e as empresas em recuperação judicial.",
+      exemplo:
+        "Empregador doméstico pessoa física obtém gratuidade de justiça: seu recurso ordinário não pode ser julgado deserto pela falta de depósito recursal.",
+    },
+  },
+  {
+    area: "processual do trabalho",
+    linha: "o preposto presente na audiência trabalhista não precisa ser empregado",
+    termo: "figura do preposto",
+    semantica: "Representação patronal em juízo autorizada pelo art. 844, §1º da CLT.",
+    virada: {
+      titulo: "Preposto não empregado",
+      raciocinio:
+        "A Reforma Trabalhista superou a antiga Súmula 377 do TST: o preposto que comparece à audiência em nome da empresa não precisa ser empregado dela, bastando conhecimento dos fatos.",
+      exemplo:
+        "Juiz decreta revelia porque o preposto da ré é terceiro prestador de serviços e não funcionário com CTPS: decisão nula que viola o art. 844, §1º da CLT.",
+    },
+  },
+  {
+    area: "processual do trabalho",
+    linha: "o jus postulandi das partes não alcança recurso ao tribunal superior",
+    termo: "jus postulandi",
+    semantica:
+      "Capacidade postulatória direta do empregado e empregador na Justiça do Trabalho (art. 791 da CLT e Súmula 425 do TST).",
+    virada: {
+      titulo: "Súmula 425 do TST",
+      raciocinio:
+        "O jus postulandi limita-se às Varas do Trabalho e aos Tribunais Regionais do Trabalho. Não alcança Ação Rescisória, Mandado de Segurança nem recursos para o TST.",
+      exemplo:
+        "Empregado sem advogado interpõe recurso de revista perante o TST: o recurso não é conhecido por incapacidade postulatória.",
+    },
+  },
+  {
+    area: "tributário",
+    linha: "a entrega da declaração do contribuinte constitui o crédito tributário",
+    termo: "súmula 436 stj",
+    semantica:
+      "Forma de constituição definitiva do crédito nos tributos sujeitos a lançamento por homologação.",
+    virada: {
+      titulo: "Súmula 436 do STJ",
+      raciocinio:
+        "A entrega de DCTF ou declaração formal pelo contribuinte confessa o débito e constitui o crédito, dispensando lançamento de ofício: a partir daí corre prescrição, não decadência.",
+      exemplo:
+        "Contribuinte alega decadência de imposto que ele próprio declarou e não recolheu há 6 anos: tese rejeitada, pois cabia apenas alegar prescrição.",
+    },
+  },
+  {
+    area: "tributário",
+    linha: "a exceção de pré executividade cabe na execução fiscal sem dilação probatória",
+    termo: "exceção de pré executividade",
+    semantica: "Meio de defesa incidental sem garantia do juízo previsto na Súmula 393 do STJ.",
+    virada: {
+      titulo: "Súmula 393 do STJ",
+      raciocinio:
+        "A exceção de pré-executividade é admissível na execução fiscal relativamente às matérias de ordem pública que possam ser conhecidas de ofício e que não demandem dilação probatória.",
+      exemplo:
+        "Executado alega prescrição com base nas certidões da própria CDA: o juiz deve analisar o pedido sem exigir penhora de bens ou embargos à execução.",
+    },
+  },
+  {
+    area: "tributário",
+    linha: "a dissolução irregular da sociedade presume responsabilidade do administrador",
+    termo: "súmula 435 stj",
+    semantica: "Redirecionamento da execução fiscal com base no art. 135, III do CTN.",
+    virada: {
+      titulo: "Súmula 435 do STJ",
+      raciocinio:
+        "Presume-se dissolvida irregularmente a empresa que deixa de funcionar no seu domicílio fiscal sem comunicação aos órgãos competentes, legitimando o redirecionamento ao sócio-gerente.",
+      exemplo:
+        "Oficial de justiça constata que a empresa fechou as portas e sumiu: a Fazenda tem direito automático de penhorar bens pessoais do administrador da época do fechamento.",
+    },
+  },
+  {
+    area: "administrativo",
+    linha: "a lei de improbidade administrativa exige a demonstração inequívoca de dolo",
+    termo: "improbidade dolosa",
+    semantica:
+      "Exigência de dolo específico introduzida pela Lei 14.230/2021 na Lei de Improbidade (art. 1º, §1º).",
+    virada: {
+      titulo: "Fim da improbidade culposa",
+      raciocinio:
+        "A Lei 14.230/21 revogou expressamente todos os tipos culposos de improbidade. Mesmo no art. 10 (dano ao erário), exige-se dolo comprovado; mera culpa grave é atípica.",
+      exemplo:
+        "Prefeito comete erro de gestão por negligência técnica e causa prejuízo ao cofre público: responde administrativamente, mas não por ato de improbidade.",
+    },
+  },
+  {
+    area: "administrativo",
+    linha: "a autoexecutoriedade do poder de polícia não autoriza cobrança forçada de multa",
+    termo: "cobrança de multa",
+    semantica: "Limites dos atributos do ato administrativo e do poder de polícia sancionatório.",
+    virada: {
+      titulo: "Execução de multa administrativa",
+      raciocinio:
+        "O poder de polícia é autoexecutório para apreender bens e interditar estabelecimentos, mas não para cobrar multas: a cobrança de multa exige execução fiscal perante o Poder Judiciário.",
+      exemplo:
+        "Fiscal da vigilância interdita restaurante e tenta bloquear a conta do dono por conta própria: o bloqueio é nulo por violar a reserva de jurisdição executiva.",
+    },
+  },
+  {
+    area: "administrativo",
+    linha:
+      "o Estado responde objetivamente e tem direito de regresso condicionado ao dolo ou culpa",
+    termo: "responsabilidade do estado",
+    semantica: "Teoria do risco administrativo consagrada no art. 37, §6º da Constituição Federal.",
+    virada: {
+      titulo: "Ação de regresso contra servidor",
+      raciocinio:
+        "O particular ajuíza a ação diretamente contra a pessoa jurídica de direito público (Tema 940 STF). O Estado responde objetivamente, e só pode reaver do servidor se comprovar dolo ou culpa.",
+      exemplo:
+        "Vítima de acidente de viatura processa o policial diretamente em juízo: o policial é parte ilegítima, a ação deve ser movida contra o Estado.",
+    },
+  },
+  {
+    area: "empresarial",
+    linha: "o aval é obrigação cambial autônoma e independe da validade da obrigação principal",
+    termo: "autonomia do aval",
+    semantica:
+      "Princípio cambial da autonomia e literalidade das garantias em títulos de crédito (art. 899 do CC).",
+    virada: {
+      titulo: "Aval x Fiança",
+      raciocinio:
+        "Diferente da fiança civil (que é acessória e se extingue com a nulidade da dívida), o aval é autônomo: o avalista continua obrigado mesmo se a assinatura do emitente for nula ou falsificada.",
+      exemplo:
+        "Em nota promissória com assinatura do devedor falsificada, o avalista idôneo que assinou o título continua obrigado a pagar o valor ao portador de boa-fé.",
+    },
+  },
+  {
+    area: "empresarial",
+    linha: "a cessão fiduciária de recebíveis não se submete à recuperação judicial",
+    termo: "trava bancária",
+    semantica:
+      "Exclusão concursal de créditos com garantia fiduciária (art. 49, §3º da Lei 11.101/2005).",
+    virada: {
+      titulo: "Trava bancária (art. 49, §3º)",
+      raciocinio:
+        "O credor titular de garantia fiduciária sobre recebíveis mercantis ou veículos não se sujeita aos efeitos da recuperação judicial, podendo reter os recursos diretamente.",
+      exemplo:
+        "Empresa em recuperação pede devolução de valores retidos pelo banco por trava bancária de duplicatas: o juízo da recuperação não pode liberar as travas fiduciárias.",
+    },
+  },
+  {
+    area: "consumidor",
+    linha: "o prazo para reclamar de vício aparente é decadencial de trinta ou noventa dias",
+    termo: "vício x fato do produto",
+    semantica: "Dicotomia central do CDC entre defeitos de funcionamento e acidentes de consumo.",
+    virada: {
+      titulo: "Art. 26 x Art. 27 do CDC",
+      raciocinio:
+        "Vício intrínseco (o produto não funciona) gera decadência de 30 dias (não durável) ou 90 dias (durável). Acidente de consumo com dano à saúde gera prescrição quinquenal de 5 anos.",
+      exemplo:
+        "Micro-ondas não esquenta: vício aparente, prazo de 90 dias. Micro-ondas explode e queima o braço do consumidor: fato do produto, prazo de 5 anos.",
+    },
+  },
+  {
+    area: "consumidor",
+    linha:
+      "o comerciante responde subsidiariamente pelo fato do produto se o fabricante for identificado",
+    termo: "responsabilidade do comerciante",
+    semantica: "Regra do art. 13 do CDC sobre a cadeia de fornecedores no acidente de consumo.",
+    virada: {
+      titulo: "Art. 13 do CDC",
+      raciocinio:
+        "No fato do produto, a responsabilidade primária é do fabricante, produtor ou importador. O comerciante só responde solidariamente se o fabricante for anônimo ou se não conservar produtos perecíveis.",
+      exemplo:
+        "Celular com marca mundial famosa explode na mão do usuário: a ação indenizatória deve ser proposta contra o fabricante; a loja vendedora não é responsável primária.",
     },
   },
   {
     area: "criança",
-    item: {
-      linha: "a internação do adolescente não excede três anos em nenhuma hipótese",
-      termo: "internação",
-      semantica:
-        "Medida socioeducativa privativa de liberdade, sujeita à brevidade e excepcionalidade (art. 121 do ECA).",
-      virada: {
-        titulo: "Limites da internação",
-        raciocinio:
-          "A internação não excede três anos, com reavaliação a cada seis meses, e a liberação é compulsória aos 21 anos (art. 121, §§ 2º, 3º e 5º).",
-        exemplo:
-          "O ato infracional foi grave e o juiz quer manter a internação por quatro anos. Ilegal: cabe habeas corpus.",
-      },
+    linha: "a internação de adolescente é restrita a hipóteses taxativas com limite de três anos",
+    termo: "internação socioeducativa",
+    semantica:
+      "Medida privativa de liberdade reservada aos atos infracionais mais graves (arts. 121 e 122 do ECA).",
+    virada: {
+      titulo: "Rol taxativo do art. 122",
+      raciocinio:
+        "A internação só cabe em: infração cometida com violência ou grave ameaça; reiteração de infrações graves; ou descumprimento reiterado de medida anterior. Não cabe por tráfico simples.",
+      exemplo:
+        "Adolescente primário apreendido com drogas sem arma nem violência: o juiz não pode decretar internação (Súmula 492 do STJ).",
+    },
+  },
+  {
+    area: "ambiental",
+    linha: "a responsabilidade civil por dano ambiental adota o risco integral e é imprescritível",
+    termo: "risco integral ambiental",
+    semantica:
+      "Regime de imputação objetiva irrestrita nos termos do art. 14, §1º da Lei 6.938/81 e Tema 999 do STF.",
+    virada: {
+      titulo: "Tema 999 do STF",
+      raciocinio:
+        "A reparação civil de danos ambientais é imprescritível e adota a teoria do risco integral, não admitindo excludentes de caso fortuito, força maior ou fato de terceiro.",
+      exemplo:
+        "Rompimento de barragem em decorrência de chuva histórica imprevisível: a mineradora responde integralmente pelo dano ecológico sem poder alegar força maior.",
     },
   },
   {
     area: "previdenciário",
-    item: {
-      linha: "durante o período de graça o segurado mantém todos os seus direitos",
-      termo: "período de graça",
-      semantica:
-        "Tempo em que a pessoa mantém a qualidade de segurado mesmo sem contribuir (art. 15 da Lei 8.213).",
-      virada: {
-        titulo: "Prorrogações do art. 15",
-        raciocinio:
-          "O período básico é de 12 meses, acrescido de 12 se houver mais de 120 contribuições sem perda da qualidade, e de mais 12 se comprovado desemprego.",
-        exemplo:
-          "O INSS nega pensão por morte alegando perda da qualidade após 14 meses sem contribuir. Com o desemprego comprovado, o segurado ainda estava coberto.",
-      },
+    linha: "o período de graça mantém a qualidade de segurado mesmo sem recolhimento",
+    termo: "período de graça",
+    semantica:
+      "Manutenção extraordinária dos direitos previdenciários prevista no art. 15 da Lei 8.213/91.",
+    virada: {
+      titulo: "Prorrogação até 36 meses",
+      raciocinio:
+        "O período de graça básico é de 12 meses, podendo ser estendido para 24 meses se o segurado pagou mais de 120 contribuições, e para 36 meses se comprovado desemprego involuntário.",
+      exemplo:
+        "Trabalhador desempregado falece 30 meses após ser demitido: os dependentes têm direito à pensão por morte porque a qualidade de segurado foi preservada.",
     },
   },
   {
     area: "eleitoral",
-    item: {
-      linha: "as condições de elegibilidade são aferidas no momento do registro",
-      termo: "elegibilidade",
-      semantica: "Capacidade eleitoral passiva: aptidão para ser votado.",
-      virada: {
-        titulo: "Art. 11, §10, da Lei 9.504",
-        raciocinio:
-          "Elegibilidade é aferida na formalização do registro, ressalvadas alterações posteriores que afastem a inelegibilidade.",
-        exemplo:
-          "A condenação do candidato é suspensa por liminar após o registro: a alteração superveniente favorável pode ser considerada para deferir a candidatura.",
-      },
+    linha: "a inelegibilidade reflexa alcança parentes até o segundo grau do chefe do executivo",
+    termo: "inelegibilidade reflexa",
+    semantica:
+      "Restrição eleitoral familiar consagrada no art. 14, §7º da Constituição e Súmula Vinculante 18.",
+    virada: {
+      titulo: "Súmula Vinculante 18",
+      raciocinio:
+        "A dissolução do casamento ou da união estável no curso do mandato não afasta a inelegibilidade reflexa para o mesmo território de jurisdição do titular.",
+      exemplo:
+        "Esposa de prefeito se divorcia amigavelmente 6 meses antes da eleição para concorrer a prefeita no mesmo município: candidatura indeferida pela SV 18.",
+    },
+  },
+  {
+    area: "internacional",
+    linha:
+      "a homologação de sentença estrangeira é competência privativa do superior tribunal de justiça",
+    termo: "homologação pelo stj",
+    semantica:
+      "Competência outorgada ao STJ pela Emenda Constitucional 45/2004 (art. 105, I, i da CF).",
+    virada: {
+      titulo: "Competência do STJ",
+      raciocinio:
+        "Sentença proferida por tribunal estrangeiro só produz efeitos e executoriedade no Brasil após homologação formal pelo STJ, não cabendo ao juiz de primeiro grau executá-la diretamente.",
+      exemplo:
+        "Pai tenta executar sentença de pensão alimentícia da justiça alemã diretamente na vara de família brasileira: petição indeferida por falta de homologação prévia no STJ.",
+    },
+  },
+  {
+    area: "direitos humanos",
+    linha: "a prisão civil do depositário infiel é ilícita em qualquer modalidade no brasil",
+    termo: "súmula vinculante 25",
+    semantica:
+      "Aplicação do Pacto de San José da Costa Rica com status supralegal na jurisprudência do STF.",
+    virada: {
+      titulo: "Súmula Vinculante 25 do STF",
+      raciocinio:
+        "É ilícita a prisão civil de depositário infiel, qualquer que seja a modalidade do depósito. No ordenamento brasileiro, a única prisão civil admitida é a do devedor de alimentos.",
+      exemplo:
+        "Juiz cível decreta prisão de devedor fiduciário que vendeu o carro financiado: ato flagrantemente nulo e ilegal por violação à SV 25.",
+    },
+  },
+  {
+    area: "filosofia",
+    linha: "na teoria do direito de dworkin as regras operam no tudo ou nada e princípios têm peso",
+    termo: "regras x princípios",
+    semantica: "Distinção estrutural de normas jurídicas formulada por Ronald Dworkin.",
+    virada: {
+      titulo: "Dimensão de peso em Dworkin",
+      raciocinio:
+        "Quando duas regras colidem, uma é válida e a outra é inválida. Quando dois princípios colidem, ambos continuam válidos no ordenamento e o juiz sopesa qual tem maior peso no caso concreto.",
+      exemplo:
+        "Liberdade de imprensa vs Privacidade: o conflito não invalida nenhuma das normas, exigindo ponderação de peso conforme as circunstâncias do fato.",
+    },
+  },
+  {
+    area: "financeiro",
+    linha: "as leis orçamentárias são de iniciativa privativa do chefe do poder executivo",
+    termo: "iniciativa orçamentária",
+    semantica: "Competência legislativa privativa para propor PPA, LDO e LOA (art. 165 da CF).",
+    virada: {
+      titulo: "Art. 165 da CF",
+      raciocinio:
+        "Plano Plurianual (PPA), Lei de Diretrizes Orçamentárias (LDO) e Lei Orçamentária Anual (LOA) são de iniciativa exclusiva do Chefe do Executivo; projeto apresentado por parlamentar padece de vício de iniciativa insanável.",
+      exemplo:
+        "Deputado estadual protocola projeto de lei da LDO na Assembleia Legislativa: a lei aprovada é formalmente inconstitucional.",
     },
   },
 ];
