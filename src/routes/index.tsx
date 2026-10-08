@@ -6,6 +6,7 @@ import { KEY_GROUPS, TRAINABLE_KEYS, charToKeys, strip } from "@/lib/abnt2";
 import { professorSays, rankOf, type Mood } from "@/lib/professor";
 import { playCombo, playError, playKey, playWin, soundSettings } from "@/lib/sound";
 import { generateStudy, type StudyItem } from "@/lib/study.functions";
+import { offlineStudy } from "@/lib/study-offline";
 import {
   adaptiveRoute,
   coachingTip,
@@ -65,18 +66,6 @@ const AREAS = [
 ];
 const CUSTOM = "__custom__";
 
-const FALLBACK_STUDY: StudyItem[] = [
-  {
-    linha: "o juiz homologou os cálculos e extinguiu a execução por sentença",
-    termo: "sentença",
-    semantica: "Pronunciamento judicial que, com fundamento nos arts. 485 ou 487 do CPC, põe fim à fase cognitiva ou extingue a execução (art. 203, §1º).",
-    virada: {
-      titulo: "Natureza do ato judicial",
-      raciocinio: "A natureza de um ato judicial é definida pelo seu conteúdo (arts. 485/487 do CPC) e pela sua finalidade (encerrar ou não a fase processual), jamais pelo nome que o juiz lhe deu.",
-      exemplo: "O juiz redige \"Despacho: homologo os cálculos e dou por satisfeita a execução.\" Não é despacho, é sentença. Cabe Apelação, não Agravo. Quem agrava perde o prazo da Apelação.",
-    },
-  },
-];
 
 interface Engine {
   text: string;
@@ -92,12 +81,39 @@ interface Engine {
   lastAt: number | null;
   errStreak: number;
   wrongAt: number | null;
+  typed: boolean[];
 }
 
 const newEngine = (text: string): Engine => ({
   text, pos: 0, errors: 0, errorMap: {}, hitMap: {}, timeMap: {}, timedMap: {},
-  combo: 0, maxCombo: 0, startedAt: null, lastAt: null, errStreak: 0, wrongAt: null,
+  combo: 0, maxCombo: 0, startedAt: null, lastAt: null, errStreak: 0, wrongAt: null, typed: [],
 });
+
+interface Prefs {
+  stopOnError: boolean;
+  caps: boolean;
+  punct: boolean;
+  symbols: boolean;
+}
+const DEFAULT_PREFS: Prefs = { stopOnError: true, caps: false, punct: false, symbols: false };
+const DAILY_SECONDS = 300;
+const todayKey = () => `lextype-practice-${new Date().toISOString().slice(0, 10)}`;
+
+const pickR = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]!;
+/** Módulos de texto do mundo real: maiúsculas, pontuação e símbolos. */
+function enrich(text: string, p: Prefs): string {
+  if (!p.caps && !p.punct && !p.symbols) return text;
+  const words = text.split(" ");
+  const out = words.map((w, i) => {
+    let x = w;
+    if (p.caps && (i === 0 || Math.random() < 0.3)) x = x.charAt(0).toUpperCase() + x.slice(1);
+    if (p.symbols && Math.random() < 0.18) x = pickR([`@${x}`, `#${x}`, `$${x}`, `§ ${x}`, `${x}_${pickR(["a", "b", "1"])}`]);
+    if (p.punct && i < words.length - 1 && Math.random() < 0.25) x += pickR([".", ",", "?", "!"]);
+    return x;
+  });
+  if (p.punct) out[out.length - 1] += ".";
+  return out.join(" ");
+}
 
 interface SessionResult {
   wpm: number;
@@ -106,6 +122,7 @@ interface SessionResult {
   maxCombo: number;
   xp: number;
   levelChange: number;
+  bonus: number;
   study?: StudyItem;
 }
 
@@ -123,6 +140,10 @@ function Index() {
   const [pinned, setPinned] = useState<StudyItem | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  const [practiceToday, setPracticeToday] = useState(0);
   const eng = useRef<Engine>(newEngine(""));
   const [, setTick] = useState(0);
   const rerender = () => setTick((t) => t + 1);
@@ -186,17 +207,20 @@ function Index() {
         const r = await fetchStudy({
           data: { area: ar, keys, seen: seenTerms.current.slice(-20), count: lineCount, reference: reference?.text },
         });
-        const items = r.itens.length ? r.itens : FALLBACK_STUDY;
-        if (r.error) setStudyError(`${r.error} Usando conteúdo offline.`);
+        const items = r.itens.length ? r.itens : offlineStudy(ar, lineCount, seenTerms.current);
+        if (r.error || !r.itens.length) setStudyError(`${r.error ?? "IA indisponível."} Usando o banco offline do professor.`);
         items.forEach((i) => seenTerms.current.push(i.termo));
         const [item, ...rest] = items;
         setStudyQueue(rest);
         setCurrentStudy(item!);
         loadText(item!.linha);
       } catch {
-        setStudyError("Sem conexão com a IA. Usando conteúdo offline.");
-        setCurrentStudy(FALLBACK_STUDY[0]!);
-        loadText(FALLBACK_STUDY[0]!.linha);
+        setStudyError("Sem conexão com a IA. Usando o banco offline do professor.");
+        const [item, ...rest] = offlineStudy(ar, lineCount, seenTerms.current);
+        seenTerms.current.push(item!.termo);
+        setStudyQueue(rest);
+        setCurrentStudy(item!);
+        loadText(item!.linha);
       } finally {
         setStudyLoading(false);
       }
@@ -215,10 +239,10 @@ function Index() {
       if (m === "automatico") {
         const r = adaptiveRoute(keys, stats);
         setRoute(r);
-        loadText(generateText({ mode: "palavras", keys: r.target, weak: r.weak, level: lvl }));
+        loadText(enrich(generateText({ mode: "palavras", keys: r.target, weak: r.weak, level: lvl }), prefsRef.current));
       } else {
         setRoute(null);
-        loadText(generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl }));
+        loadText(enrich(generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl }), prefsRef.current));
       }
     },
     [effectiveArea, loadText, nextStudy, studyQueue],
@@ -238,6 +262,14 @@ function Index() {
     setMuted(m);
     soundSettings.enabled = !m;
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
+    try {
+      const saved = { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem("lextype-prefs") ?? "{}") } as Prefs;
+      setPrefs(saved);
+      prefsRef.current = saved;
+    } catch {
+      /* preferências corrompidas: usa padrão */
+    }
+    setPracticeToday(loadNum(todayKey(), 0));
     reset("automatico", KEY_GROUPS.Central, st, lvl);
     say("start");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,7 +315,12 @@ function Index() {
       saveNum("lextype-level", nl);
     }
 
-    const gained = Math.round(len * (accuracy / 100) * (1 + e.maxCombo / 40) * (mode === "automatico" ? 1 + level / 10 : 1));
+    const secs = Math.round(minutes * 60);
+    const practiced = loadNum(todayKey(), 0) + secs;
+    saveNum(todayKey(), practiced);
+    setPracticeToday(practiced);
+    const bonus = accuracy >= 97 ? 1.5 : accuracy >= 95 ? 1.25 : 1;
+    const gained = Math.round(bonus * len * (accuracy / 100) * (1 + e.maxCombo / 40) * (mode === "automatico" ? 1 + level / 10 : 1));
     const newXp = xp + gained;
     setXp(newXp);
     saveNum("lextype-xp", newXp);
@@ -293,7 +330,7 @@ function Index() {
     setBestWpm((b) => Math.max(b, wpm));
 
     if (currentStudy) setPinned(currentStudy);
-    setResult({ wpm, accuracy, errors: e.errors, maxCombo: e.maxCombo, xp: gained, levelChange, ...(currentStudy ? { study: currentStudy } : {}) });
+    setResult({ wpm, accuracy, errors: e.errors, maxCombo: e.maxCombo, xp: gained, levelChange, bonus, ...(currentStudy ? { study: currentStudy } : {}) });
     playWin();
     if (levelChange > 0) say("levelUp");
     else if (levelChange < 0) say("levelDown");
@@ -304,6 +341,7 @@ function Index() {
     (ch: string) => {
       const e = eng.current;
       if (result || !e.text || e.pos >= e.text.length) return;
+      const fluid = !prefsRef.current.stopOnError;
       const expected = e.text[e.pos]!;
       const now = Date.now();
       if (!e.startedAt) {
@@ -311,7 +349,7 @@ function Index() {
         e.lastAt = now;
         setRunning(true);
       }
-      const correct = ch === expected || strip(ch).toLowerCase() === strip(expected).toLowerCase();
+      const correct = ch === expected || strip(ch) === strip(expected);
       const keys = charToKeys(expected);
       if (correct) {
         const dt = now - (e.lastAt ?? now);
@@ -323,6 +361,7 @@ function Index() {
           }
         }
         e.lastAt = now;
+        e.typed.push(true);
         e.pos++;
         e.combo++;
         e.errStreak = 0;
@@ -335,13 +374,17 @@ function Index() {
           say("combo", { n: e.combo });
         }
         setFlash(null);
-        if (e.pos >= e.text.length) finish();
+        if (e.pos >= e.text.length && e.typed.every(Boolean)) finish();
       } else {
         e.errors++;
         for (const k of keys) e.errorMap[k] = (e.errorMap[k] ?? 0) + 1;
         e.combo = 0;
         e.errStreak++;
         e.wrongAt = e.pos;
+        if (fluid) {
+          e.typed.push(false);
+          e.pos++;
+        }
         playError();
         setFlash({ key: keys[keys.length - 1]!, type: "err" });
         if (e.errStreak === 3) say("errorStreak");
@@ -351,6 +394,16 @@ function Index() {
     },
     [finish, result, say],
   );
+
+  const backspace = () => {
+    const e = eng.current;
+    if (prefsRef.current.stopOnError || result || e.pos === 0) return;
+    e.pos--;
+    e.typed.pop();
+    e.wrongAt = e.typed.lastIndexOf(false) >= 0 ? e.typed.lastIndexOf(false) : null;
+    playKey();
+    rerender();
+  };
 
   const handleInput = (el: HTMLInputElement, final: boolean) => {
     const v = el.value;
@@ -389,6 +442,14 @@ function Index() {
     setTheme(t);
     document.documentElement.classList.toggle("dark", t === "dark");
     localStorage.setItem("lextype-theme", t);
+  };
+
+  const updatePrefs = (patch: Partial<Prefs>) => {
+    const next = { ...prefsRef.current, ...patch };
+    setPrefs(next);
+    prefsRef.current = next;
+    localStorage.setItem("lextype-prefs", JSON.stringify(next));
+    if (mode !== "estudos" && ("caps" in patch || "punct" in patch || "symbols" in patch)) reset(mode, selectedKeys, keyStats, level);
   };
 
   const onFile = async (file: File | undefined) => {
@@ -459,13 +520,17 @@ function Index() {
               </div>
               {rank.next && <div className="mt-0.5 text-[0.65rem] text-muted-foreground">próx.: {rank.next}</div>}
             </div>
-            <div className="text-center">
-              <div className="flex gap-1">
-                {Array.from({ length: DAILY_GOAL }, (_, i) => (
-                  <span key={i} className={cn("h-2.5 w-2.5 rounded-full", i < today ? "bg-success" : "bg-secondary")} />
-                ))}
+            <div className="min-w-32" title="5 minutos por dia, todos os dias, costumam levar de 50 a 75 PPM em poucos meses.">
+              <div className="flex justify-between text-xs">
+                <span className="font-semibold">{practiceToday >= DAILY_SECONDS ? "✅ Desafio feito" : "Desafio 5 min"}</span>
+                <span className="font-mono-type text-muted-foreground">
+                  {Math.floor(Math.min(practiceToday, DAILY_SECONDS) / 60)}:{String(Math.min(practiceToday, DAILY_SECONDS) % 60).padStart(2, "0")}
+                </span>
               </div>
-              <div className="mt-1 text-[0.65rem] text-muted-foreground">meta do dia</div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                <div className="h-full bg-success transition-all duration-700" style={{ width: `${Math.min(1, practiceToday / DAILY_SECONDS) * 100}%` }} />
+              </div>
+              <div className="mt-0.5 text-[0.65rem] text-muted-foreground">{today} sessões hoje</div>
             </div>
             <Stat value={`${streak}🔥`} label="dias" gold />
             <Stat value={bestWpm} label="melhor PPM" />
@@ -499,6 +564,11 @@ function Index() {
                 ))}
               </div>
             </div>
+            <Toggle on={prefs.stopOnError} onChange={(v) => updatePrefs({ stopOnError: v })} label="Parar cursor em caso de erro" />
+            <span className="text-muted-foreground">Incluir no texto:</span>
+            <Toggle on={prefs.caps} onChange={(v) => updatePrefs({ caps: v })} label="Maiúsculas" />
+            <Toggle on={prefs.punct} onChange={(v) => updatePrefs({ punct: v })} label="Pontuação (. , ? !)" />
+            <Toggle on={prefs.symbols} onChange={(v) => updatePrefs({ symbols: v })} label="Símbolos (@ # $ § _)" />
             <button onClick={toggleMute} className="rounded-md border border-border px-3 py-1 hover:bg-secondary">
               {muted ? "🔇 Som desligado" : "🔊 Som ligado"}
             </button>
@@ -653,8 +723,8 @@ function Index() {
                     <span
                       key={i}
                       className={cn(
-                        i < pos && "text-muted-foreground/40",
-                        i === pos && (e.wrongAt === i ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake" : "rounded-sm bg-gold/30 text-gold animate-caret"),
+                        i < pos && (e.typed[i] === false ? "rounded-sm bg-destructive/25 text-destructive" : "text-muted-foreground/40"),
+                        i === pos && (prefs.stopOnError && e.wrongAt === i ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake" : "rounded-sm bg-gold/30 text-gold animate-caret"),
                         i > pos && "text-foreground",
                       )}
                     >
@@ -664,7 +734,11 @@ function Index() {
                 </p>
               )}
               <p className="mt-5 text-center text-xs text-muted-foreground">
-                {focused ? "Errou? Você só avança quando acertar a tecla." : "Toque ou clique aqui e comece a digitar"}
+                {focused
+                  ? prefs.stopOnError
+                    ? "Errou? Você só avança quando acertar a tecla."
+                    : "Modo fluido: use Backspace para corrigir os erros em vermelho."
+                  : "🎯 Devagar e com precisão — a velocidade surge naturalmente. Toque aqui e comece."}
               </p>
               <input
                 ref={inputRef}
@@ -683,6 +757,12 @@ function Index() {
                   handleInput(ev.currentTarget, true);
                 }}
                 onInput={(ev) => handleInput(ev.currentTarget, false)}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Backspace" && !composing.current && ev.currentTarget.value === "") {
+                    ev.preventDefault();
+                    backspace();
+                  }
+                }}
               />
             </>
           )}
@@ -753,6 +833,23 @@ function Index() {
   );
 }
 
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        onClick={() => onChange(!on)}
+        className={cn("relative h-5 w-9 rounded-full transition-colors", on ? "bg-gold" : "bg-secondary")}
+      >
+        <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-card shadow transition-all", on ? "left-4.5" : "left-0.5")} />
+      </button>
+      {label}
+    </label>
+  );
+}
+
 function Stat({ value, label, gold }: { value: string | number; label: string; gold?: boolean }) {
   return (
     <div className="text-center">
@@ -801,6 +898,11 @@ function ResultView({ result, weak, onNext, repeat }: { result: SessionResult; w
         <Big value={result.maxCombo} label="Maior combo" />
         <Big value={`+${result.xp}`} label="XP" cls="text-success" />
       </div>
+      {result.bonus > 1 && (
+        <p className="text-sm font-semibold text-success">
+          🎯 Precisão {result.accuracy >= 97 ? "de elite (≥97%): XP ×1,5" : "excelente (≥95%): XP ×1,25"}
+        </p>
+      )}
       {result.levelChange !== 0 && (
         <p className={cn("text-sm font-semibold", result.levelChange > 0 ? "text-success" : "text-destructive")}>
           {result.levelChange > 0 ? "▲ Subiu de nível — a próxima rota será mais pesada" : "▼ Nível reduzido — de volta ao básico"}
