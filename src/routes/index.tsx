@@ -185,6 +185,7 @@ function Index() {
       setElapsed(0);
       setRunning(false);
       setResult(null);
+      setFlash(null);
       rerender();
     },
     [],
