@@ -89,9 +89,11 @@ Seja rigorosamente correto quanto à legislação brasileira vigente. Responda e
       const body = await res.text().catch(() => "");
       console.error(`AI gateway error [${res.status}]: ${body}`);
       const msg =
-        res.status === 429 ? "Muitas requisições, tente em instantes." :
-        res.status === 402 ? "Créditos de IA esgotados." :
-        `Falha ao gerar conteúdo (${res.status}).`;
+        res.status === 429
+          ? "Muitas requisições, tente em instantes."
+          : res.status === 402
+            ? "Créditos de IA esgotados."
+            : `Falha ao gerar conteúdo (${res.status}).`;
       return { itens: [], error: msg };
     }
 

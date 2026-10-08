@@ -5,14 +5,23 @@ export const soundSettings = { enabled: true, volume: 0.6 };
 function ac(): AudioContext | null {
   if (typeof window === "undefined" || !soundSettings.enabled) return null;
   if (!ctx) {
-    const C = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const C =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     ctx = new C();
   }
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
 }
 
-function tone(freq: number, start: number, dur: number, type: OscillatorType, gain: number, endFreq?: number) {
+function tone(
+  freq: number,
+  start: number,
+  dur: number,
+  type: OscillatorType,
+  gain: number,
+  endFreq?: number,
+) {
   const a = ac();
   if (!a) return;
   const t = a.currentTime + start;
