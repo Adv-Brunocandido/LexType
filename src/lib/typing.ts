@@ -46,7 +46,7 @@ function score(text: string, target: Set<string>, weak: Set<string>): number {
 
 export function generateText(opts: { mode: Exclude<Mode, "automatico">; keys: string[]; weak?: string[]; level?: number }): string {
   const { mode, weak = [], level = 3 } = opts;
-  const keys = opts.keys.length ? opts.keys : KEY_GROUPS.Central!;
+  const keys = opts.keys.length ? opts.keys : KEY_GROUPS.Central;
   const target = new Set(keys);
   const weakSet = new Set(weak);
   const count = 5 + level;
@@ -150,7 +150,7 @@ export function adaptiveRoute(seed: string[], stats: KeyStats) {
     .slice(0, 5)
     .map(([k]) => k);
   let target = [...new Set([...detected, ...seed])].slice(0, 9);
-  if (!target.length) target = KEY_GROUPS.Central!;
+  if (!target.length) target = KEY_GROUPS.Central;
   const weak = [...new Set([...detected.slice(0, 3), ...seed.filter((k) => difficultyOf(stats[k]) > 6 || !stats[k])])].slice(0, 4);
   return { target, weak, detected };
 }
@@ -159,13 +159,13 @@ export function coachingTip(weak: string[]): string {
   if (weak.length === 0)
     return "Mantenha os dedos ancorados na fileira central (asdf / jklç) e deixe apenas o dedo responsável se mover — o pulso fica estático.";
   const k = weak[0]!;
-  if (KEY_GROUPS.Números!.includes(k))
+  if (KEY_GROUPS.Números.includes(k))
     return `A tecla "${k}" está na fileira de números: é o salto mais longo. Estenda o dedo sem tirar o pulso do lugar e volte à fileira central a cada toque.`;
   if (["´", "~"].includes(k))
     return `"${k}" é tecla morta: pressione-a com o mínimo direito e depois a vogal. Não espere ver o acento antes da vogal — o ritmo é um único movimento.`;
-  if (KEY_GROUPS.Superior!.includes(k))
+  if (KEY_GROUPS.Superior.includes(k))
     return `A tecla "${k.toUpperCase()}" está na fileira superior: estenda o dedo a partir da articulação e retorne imediatamente à tecla de repouso.`;
-  if (KEY_GROUPS.Inferior!.includes(k))
+  if (KEY_GROUPS.Inferior.includes(k))
     return `A tecla "${k.toUpperCase()}" está na fileira inferior: não deixe a mão "viajar" com o dedo. Mantenha os demais dedos ancorados.`;
   return `A tecla "${k.toUpperCase()}": reduza a velocidade em 20% e priorize precisão — velocidade é consequência de repetições corretas.`;
 }

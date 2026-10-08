@@ -22,3 +22,8 @@
 - [ ] Virada de chave só fecha quando o usuário quiser
 - [ ] Botão repetir (ficar na mesma frase)
 - [ ] Enviar arquivo de texto/diretriz como referência para a IA
+- [ ] Corrigir Estudos sem IA: banco de conteúdo offline por matéria
+- [ ] Configuração: parar cursor no erro (estrito) x fluido com Backspace
+- [ ] Módulos de texto: maiúsculas, pontuação, símbolos (@ # $ § _)
+- [ ] Desafio diário de 5 minutos + estatística motivacional
+- [ ] Foco em precisão: dica e bônus para ≥95% / ≥97%

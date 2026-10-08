@@ -113,7 +113,7 @@ const COMBO_MILESTONES = [10, 25, 50, 75, 100, 150, 200];
 const DAILY_GOAL = 5;
 
 function Index() {
-  const [selectedKeys, setSelectedKeys] = useState<string[]>(KEY_GROUPS.Central!);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>(KEY_GROUPS.Central);
   const [mode, setMode] = useState<FullMode>("automatico");
   const [area, setArea] = useState(AREAS[0]!);
   const [customArea, setCustomArea] = useState("");
@@ -238,7 +238,7 @@ function Index() {
     setMuted(m);
     soundSettings.enabled = !m;
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
-    reset("automatico", KEY_GROUPS.Central!, st, lvl);
+    reset("automatico", KEY_GROUPS.Central, st, lvl);
     say("start");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -293,7 +293,7 @@ function Index() {
     setBestWpm((b) => Math.max(b, wpm));
 
     if (currentStudy) setPinned(currentStudy);
-    setResult({ wpm, accuracy, errors: e.errors, maxCombo: e.maxCombo, xp: gained, levelChange, study: currentStudy ?? undefined });
+    setResult({ wpm, accuracy, errors: e.errors, maxCombo: e.maxCombo, xp: gained, levelChange, ...(currentStudy ? { study: currentStudy } : {}) });
     playWin();
     if (levelChange > 0) say("levelUp");
     else if (levelChange < 0) say("levelDown");

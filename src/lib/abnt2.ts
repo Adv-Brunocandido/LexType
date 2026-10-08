@@ -8,7 +8,7 @@ export interface KeyDef {
   trainable?: boolean;
 }
 
-const k = (id: string, shift?: string): KeyDef => ({ id, shift, trainable: true });
+const k = (id: string, shift?: string): KeyDef => (shift ? { id, shift, trainable: true } : { id, trainable: true });
 const sp = (id: string, label: string, w: number): KeyDef => ({ id, label, w, trainable: false });
 
 export const ABNT2_ROWS: KeyDef[][] = [
@@ -34,14 +34,14 @@ export const ABNT2_ROWS: KeyDef[][] = [
 
 export const TRAINABLE_KEYS = ABNT2_ROWS.flat().filter((d) => d.trainable).map((d) => d.id);
 
-export const KEY_GROUPS: Record<string, string[]> = {
+export const KEY_GROUPS = {
   Números: "1234567890".split(""),
   Superior: "qwertyuiop".split(""),
   Central: "asdfghjklç".split(""),
   Inferior: "zxcvbnm".split(""),
   Acentos: ["´", "~", "ç"],
   Pontuação: [",", ".", ";", "/", "-", "=", "'", "[", "]", "\\"],
-};
+} satisfies Record<string, string[]>;
 
 const SHIFT_TO_ID: Record<string, string> = {};
 for (const d of ABNT2_ROWS.flat()) if (d.shift) SHIFT_TO_ID[d.shift] = d.id;
