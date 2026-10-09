@@ -16,7 +16,10 @@ import {
   type SoundProfile,
 } from "@/lib/sound";
 import { generateStudy, type StudyItem } from "@/lib/study.functions";
-import { offlineStudy } from "@/lib/study-offline";
+import { offlineStudy, extractComplexLegalTerm } from "@/lib/study-offline";
+import { LeiSecaPanel } from "@/components/LeiSecaPanel";
+import { MovableCard } from "@/components/MovableCard";
+import type { LeiSecaItem } from "@/lib/lei-seca";
 import {
   adaptiveRoute,
   coachingTip,
@@ -168,11 +171,50 @@ function Index() {
     } catch {}
     return 2;
   });
-  const [reference, setReference] = useState<{ name: string; text: string } | null>(null);
+  const [reference, setReference] = useState<{
+    name: string;
+    text: string;
+    sentences: string[];
+    activeSentenceIdx: number;
+  } | null>(null);
   const [repeat, setRepeat] = useState(false);
   const [pinned, setPinned] = useState<StudyItem | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<"treino" | "desempenho">("treino");
+  const [activeTab, setActiveTab] = useState<"treino" | "leiseca" | "desempenho">("treino");
+
+  // Ordem das caixas movíveis e reposicionáveis na tela
+  const [boxOrder, setBoxOrder] = useState<string[]>(() => {
+    if (typeof localStorage === "undefined") return ["typing", "lesson", "keyboard", "keys"];
+    try {
+      const s = localStorage.getItem("lextype-box-order");
+      if (s) {
+        const p = JSON.parse(s);
+        if (Array.isArray(p) && p.length >= 2) return p;
+      }
+    } catch {}
+    return ["typing", "lesson", "keyboard", "keys"];
+  });
+
+  const moveBox = (id: string, dir: "up" | "down") => {
+    setBoxOrder((prev) => {
+      const idx = prev.indexOf(id);
+      if (idx === -1) return prev;
+      const target = dir === "up" ? idx - 1 : idx + 1;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const item = next[idx]!;
+      next[idx] = next[target]!;
+      next[target] = item;
+      localStorage.setItem("lextype-box-order", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const resetBoxes = () => {
+    const def = ["typing", "lesson", "keyboard", "keys"];
+    setBoxOrder(def);
+    localStorage.setItem("lextype-box-order", JSON.stringify(def));
+  };
 
   // Tamanhos de fonte individuais por caixa
   const [fontTyping, setFontTyping] = useState<"sm" | "md" | "lg" | "xl">(() => {
@@ -333,7 +375,9 @@ function Index() {
             userApiProvider: aiProvider || undefined,
           },
         });
-        const items = r.itens.length ? r.itens : offlineStudy(ar, activeCount, seenTerms.current);
+        const items = r.itens.length
+          ? r.itens
+          : offlineStudy(ar, activeCount, seenTerms.current, reference?.text);
         if (r.error || !r.itens.length)
           setStudyError(`${r.error ?? "IA indisponível."} Usando o banco offline do professor.`);
         items.forEach((i) => seenTerms.current.push(i.termo));
@@ -665,13 +709,33 @@ function Index() {
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
-    if (!/\.(txt|md|csv|json|html?)$/i.test(file.name) && !file.type.startsWith("text/")) {
-      setStudyError("Envie um arquivo de texto (.txt ou .md).");
+    if (!/\.(txt|md|csv|json|html?|pdf)$/i.test(file.name) && !file.type.startsWith("text/")) {
+      setStudyError("Envie um arquivo educacional (.txt, .md, .csv, .json).");
       return;
     }
-    const text = (await file.text()).slice(0, 30000);
-    setReference({ name: file.name, text });
+    const raw = (await file.text()).slice(0, 50000);
+    const cleaned = raw.replace(/[\u00A0\u200B]/g, " ").replace(/\r\n/g, "\n").trim();
+    const extracted = cleaned
+      .split(/(?<=[.?!;\n])\s+/)
+      .map((s) => s.replace(/\s+/g, " ").trim())
+      .filter((s) => s.length >= 15 && s.length <= 180);
+
+    const sentences = extracted.length ? extracted : [cleaned.slice(0, 120)];
+    setReference({
+      name: file.name,
+      text: cleaned,
+      sentences,
+      activeSentenceIdx: 0,
+    });
     setStudyError(null);
+  };
+
+  const practiceReferenceSentence = () => {
+    if (!reference || !reference.sentences.length) return;
+    const idx = reference.activeSentenceIdx % reference.sentences.length;
+    const sent = reference.sentences[idx]!;
+    loadText(sent);
+    setReference((prev) => (prev ? { ...prev, activeSentenceIdx: idx + 1 } : null));
   };
 
   const applyKeys = (keys: string[]) => {
@@ -714,6 +778,9 @@ function Index() {
   const rank = rankOf(xp, bestWpm, liveAcc);
   const inFlow = running && !result;
   const progress = e.text.length ? pos / e.text.length : 0;
+  const complexTerm = useMemo(() => {
+    return extractComplexLegalTerm(e.text || "");
+  }, [e.text]);
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors">
@@ -746,6 +813,17 @@ function Index() {
                 )}
               >
                 ⌨️ Treino
+              </button>
+              <button
+                onClick={() => setActiveTab("leiseca")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-semibold transition-colors",
+                  activeTab === "leiseca"
+                    ? "bg-gold text-gold-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                📜 Lei Seca
               </button>
               <button
                 onClick={() => setActiveTab("desempenho")}
@@ -1055,7 +1133,29 @@ function Index() {
 
       {activeTab === "desempenho" ? (
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-          <AnalyticsDashboard onBackToPractice={() => setActiveTab("treino")} />
+          <AnalyticsDashboard
+            stats={keyStats}
+            xp={xp}
+            bestWpm={bestWpm}
+            streak={streak}
+            practiceTodaySeconds={practiceToday}
+            onTrainWeakKeys={(keys) => {
+              applyKeys(keys);
+              setActiveTab("treino");
+            }}
+            onSwitchToPractice={() => setActiveTab("treino")}
+            onBackToPractice={() => setActiveTab("treino")}
+          />
+        </main>
+      ) : activeTab === "leiseca" ? (
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+          <LeiSecaPanel
+            onSelectForTyping={(item) => {
+              loadText(item.texto);
+              setActiveTab("treino");
+            }}
+            onClose={() => setActiveTab("treino")}
+          />
         </main>
       ) : (
         <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
@@ -1217,326 +1317,396 @@ function Index() {
               )}
               {studyError && <span className="text-xs text-destructive">{studyError}</span>}
             </div>
+            {reference && reference.sentences.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gold/20 pt-2 text-xs">
+                <span className="text-muted-foreground">
+                  📄 <strong>{reference.name}</strong>: {reference.sentences.length} frases prontas para treino.
+                </span>
+                <button
+                  onClick={practiceReferenceSentence}
+                  className="rounded bg-gold/20 hover:bg-gold hover:text-gold-foreground text-gold px-3 py-1 font-semibold transition-colors"
+                  title="Carregar a próxima frase do seu arquivo para praticar imediatamente"
+                >
+                  ⚡ Digitar Frase do Arquivo ({reference.activeSentenceIdx + 1}/{reference.sentences.length})
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Controles de Cabeçalho da Área de Digitação & Modularidade */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <span>Área de Digitação</span>
-            {lineCount === 1 && (
-              <span className="rounded bg-gold/15 px-2 py-0.5 text-[0.65rem] font-bold text-gold">
-                Linha Única Estrita
-              </span>
-            )}
+        {/* Barra de Status e Restauração dos Painéis Independentes */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>📐 <strong>Painéis Modulares:</strong> use ▲▼ para reposicionar e ◀ Esquerda / Direita ▶ para alargar as caixas.</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Controle de Fonte da Caixa de Digitação */}
-            <div className="flex items-center rounded-md border border-border bg-card text-xs">
-              <span className="px-2 py-0.5 text-[0.65rem] text-muted-foreground">Fonte:</span>
-              <button
-                onClick={() => {
-                  const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
-                  const idx = Math.max(0, sizes.indexOf(fontTyping) - 1);
-                  setFontTyping(sizes[idx]!);
-                  localStorage.setItem("lextype-font-typing", sizes[idx]!);
-                }}
-                disabled={fontTyping === "sm"}
-                className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 border-r border-border font-bold"
-                title="Diminuir fonte da digitação"
-              >
-                A−
-              </button>
-              <button
-                onClick={() => {
-                  const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
-                  const idx = Math.min(sizes.length - 1, sizes.indexOf(fontTyping) + 1);
-                  setFontTyping(sizes[idx]!);
-                  localStorage.setItem("lextype-font-typing", sizes[idx]!);
-                }}
-                disabled={fontTyping === "xl"}
-                className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 font-bold"
-                title="Aumentar fonte da digitação"
-              >
-                A+
-              </button>
-            </div>
-            {/* Toggle Layout Lado a Lado / Empilhado */}
-            <button
-              onClick={() => {
-                setLayoutSplit((s) => {
-                  const next = !s;
-                  localStorage.setItem("lextype-layout-split", next ? "1" : "0");
-                  return next;
-                });
-              }}
-              className={cn(
-                "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                layoutSplit
-                  ? "border-gold bg-gold/15 text-gold"
-                  : "border-border bg-card text-muted-foreground hover:bg-secondary",
-              )}
-              title="Alternar entre layout empilhado ou lado a lado com a aula jurídica"
-            >
-              {layoutSplit ? "⚏ Lado a Lado" : "☰ Empilhado"}
-            </button>
-          </div>
+          <button
+            onClick={resetBoxes}
+            className="hover:text-gold text-[11px] underline transition-colors"
+            title="Restaurar posições originais das caixas"
+          >
+            ↺ Restaurar ordem padrão
+          </button>
         </div>
 
-        {/* Estrutura modular desacoplada: Lado a Lado vs Empilhado */}
-        <div
-          className={cn(
-            layoutSplit && pinned
-              ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start"
-              : "space-y-6",
-          )}
-        >
-          {/* Caixa de Digitação Redimensionável */}
-          <section
-            onClick={() => inputRef.current?.focus()}
-            style={{
-              minHeight: lineCount === 1 ? "5.5rem" : `${Math.max(8.5, 4.5 + lineCount * 2.8)}rem`,
-              maxHeight: lineCount === 1 ? "8.5rem" : "75vh",
-            }}
-            className={cn(
-              "relative rounded-xl border bg-card p-5 transition-all duration-300 sm:p-8 resize overflow-auto",
-              focused ? "border-gold/50 ring-2 ring-ring/30" : "border-border",
-            )}
-          >
-            {result ? (
-              <ResultView result={result} weak={weak} repeat={repeat} onNext={goNext} />
-            ) : (
-              <>
-                <div className="mb-2 h-1 overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className="h-full bg-gold transition-all duration-150"
-                    style={{ width: `${progress * 100}%` }}
+        {/* Blocos Modulares e Reposicionáveis */}
+        <div className="space-y-6">
+          {boxOrder.map((boxId) => {
+            if (boxId === "typing") {
+              return (
+                <MovableCard
+                  key="typing"
+                  id="typing"
+                  title="Área de Digitação"
+                  icon="⌨️"
+                  canMoveUp={boxOrder.indexOf("typing") > 0}
+                  canMoveDown={boxOrder.indexOf("typing") < boxOrder.length - 1}
+                  onMoveUp={() => moveBox("typing", "up")}
+                  onMoveDown={() => moveBox("typing", "down")}
+                  extraHeaderControls={
+                    <div className="flex items-center gap-2">
+                      {lineCount === 1 && (
+                        <span className="rounded bg-gold/15 px-2 py-0.5 text-[0.65rem] font-bold text-gold">
+                          Linha Única
+                        </span>
+                      )}
+                      <div className="flex items-center rounded-md border border-border bg-card text-xs">
+                        <span className="px-2 py-0.5 text-[0.65rem] text-muted-foreground">Fonte:</span>
+                        <button
+                          onClick={() => {
+                            const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                            const idx = Math.max(0, sizes.indexOf(fontTyping) - 1);
+                            setFontTyping(sizes[idx]!);
+                            localStorage.setItem("lextype-font-typing", sizes[idx]!);
+                          }}
+                          disabled={fontTyping === "sm"}
+                          className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 border-r border-border font-bold"
+                          title="Diminuir fonte da digitação"
+                        >
+                          A−
+                        </button>
+                        <button
+                          onClick={() => {
+                            const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                            const idx = Math.min(sizes.length - 1, sizes.indexOf(fontTyping) + 1);
+                            setFontTyping(sizes[idx]!);
+                            localStorage.setItem("lextype-font-typing", sizes[idx]!);
+                          }}
+                          disabled={fontTyping === "xl"}
+                          className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 font-bold"
+                          title="Aumentar fonte da digitação"
+                        >
+                          A+
+                        </button>
+                      </div>
+                    </div>
+                  }
+                >
+                  <section
+                    onClick={() => inputRef.current?.focus()}
+                    style={{
+                      minHeight: lineCount === 1 ? "5.5rem" : `${Math.max(8.5, 4.5 + lineCount * 2.8)}rem`,
+                      maxHeight: lineCount === 1 ? "8.5rem" : "75vh",
+                    }}
+                    className={cn(
+                      "relative rounded-lg p-2 transition-all duration-300 overflow-auto",
+                      focused ? "ring-1 ring-gold/30" : "",
+                    )}
+                  >
+                    {result ? (
+                      <ResultView result={result} weak={weak} repeat={repeat} onNext={goNext} />
+                    ) : (
+                      <>
+                        <div className="mb-2 h-1 overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className="h-full bg-gold transition-all duration-150"
+                            style={{ width: `${progress * 100}%` }}
+                          />
+                        </div>
+                        <div className="mb-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-mono-type text-sm">
+                          <span className="text-muted-foreground">
+                            PPM <span className="font-bold text-gold">{liveWpm}</span>
+                          </span>
+                          <span className="text-muted-foreground">
+                            Precisão <span className="font-bold text-foreground">{liveAcc}%</span>
+                          </span>
+                          <span className="text-muted-foreground">
+                            Tempo <span className="font-bold text-foreground">{elapsed.toFixed(0)}s</span>
+                          </span>
+                          <span
+                            key={comboPulse}
+                            className={cn(
+                              "animate-combo text-muted-foreground",
+                              e.combo >= 10 && "text-gold",
+                            )}
+                          >
+                            Combo <span className="font-bold">{e.combo}</span>
+                            {e.combo >= 25 ? " 🔥" : ""}
+                            {e.combo >= 50 ? "🔥" : ""}
+                          </span>
+                        </div>
+                        {studyLoading ? (
+                          <p className="py-6 text-center text-muted-foreground">
+                            O professor está preparando a aula de {effectiveArea}…
+                          </p>
+                        ) : (
+                          <p
+                            className={cn(
+                              "font-mono-type leading-relaxed tracking-wide transition-all",
+                              TYPING_FONT_CLASSES[fontTyping],
+                              lineCount === 1 && "overflow-hidden",
+                            )}
+                          >
+                            {e.text.split("").map((ch, i) => {
+                              const isErrorMark = e.marks[i] === true;
+                              return (
+                                <span
+                                  key={i}
+                                  className={cn(
+                                    i < pos &&
+                                      (isErrorMark
+                                        ? "rounded-sm bg-destructive/25 text-destructive font-bold underline"
+                                        : "text-muted-foreground/40"),
+                                    i === pos &&
+                                      (prefs.stopOnError && e.wrongAt === i
+                                        ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake"
+                                        : "rounded-sm bg-gold/30 text-gold animate-caret"),
+                                    i > pos && "text-foreground",
+                                  )}
+                                >
+                                  {ch === " " && i === pos ? "␣" : ch}
+                                </span>
+                              );
+                            })}
+                          </p>
+                        )}
+
+                        {/* Semântica e Impacto Prático do Termo Mais Complexo */}
+                        {complexTerm && !result && (
+                          <div className="mt-4 rounded-lg border border-gold/40 bg-gold/5 p-3.5 text-xs">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                              <div className="flex items-center gap-1.5 font-bold text-gold">
+                                <span>📖 Vocabulário Jurídico Chave:</span>
+                                <span className="font-mono-type bg-gold/20 px-2 py-0.5 rounded text-foreground uppercase tracking-wide">
+                                  {complexTerm.termo}
+                                </span>
+                              </div>
+                              <span className="text-[10px] uppercase font-bold text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                                {complexTerm.categoria}
+                              </span>
+                            </div>
+                            <p className="text-foreground leading-relaxed">
+                              <strong>Significado Técnico:</strong> {complexTerm.significado}
+                            </p>
+                            {complexTerm.virada && (
+                              <p className="text-muted-foreground mt-1.5 border-t border-gold/15 pt-1.5">
+                                <span className="text-gold font-semibold">💡 Impacto Prático / Pegadinha FGV:</span> {complexTerm.virada}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="mt-5 text-center text-xs text-muted-foreground">
+                          {focused
+                            ? prefs.stopOnError
+                              ? "Modo estrito: o cursor trava na letra errada até você acertar."
+                              : "Modo fluido: continue digitando e use Backspace para retornar e corrigir as letras em vermelho."
+                            : "🎯 A velocidade surge da precisão. Clique ou toque aqui para começar."}
+                        </p>
+                        <input
+                          ref={inputRef}
+                          aria-label="Área de digitação"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          autoComplete="off"
+                          spellCheck={false}
+                          enterKeyHint="next"
+                          className="absolute inset-0 h-full w-full cursor-text opacity-0"
+                          onFocus={() => setFocused(true)}
+                          onBlur={() => setFocused(false)}
+                          onCompositionEnd={(ev) => {
+                            composing.current = false;
+                            handleInput(ev.currentTarget, true);
+                          }}
+                          onInput={(ev) => handleInput(ev.currentTarget, false)}
+                        />
+                      </>
+                    )}
+                  </section>
+
+                  {/* Controles rápidos logo abaixo da digitação */}
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3 border-t border-border/40 pt-3">
+                    <button
+                      onClick={() => setRepeat((r) => !r)}
+                      aria-pressed={repeat}
+                      title="Repetir a mesma frase deliberadamente"
+                      className={cn(
+                        "rounded-full border px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors",
+                        repeat
+                          ? "border-gold bg-gold text-gold-foreground"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      🔁 Repetir frase {repeat ? "ligado" : "desligado"}
+                    </button>
+                    {!result && e.text && (
+                      <button
+                        onClick={handleRestartLine}
+                        className="rounded-full border border-border bg-card px-4 py-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        ↺ Recomeçar esta
+                      </button>
+                    )}
+                  </div>
+                </MovableCard>
+              );
+            }
+
+            if (boxId === "lesson") {
+              const activeLesson = pinned || currentStudy;
+              return (
+                <MovableCard
+                  key="lesson"
+                  id="lesson"
+                  title="Aula & Virada de Chave"
+                  icon="🎓"
+                  canMoveUp={boxOrder.indexOf("lesson") > 0}
+                  canMoveDown={boxOrder.indexOf("lesson") < boxOrder.length - 1}
+                  onMoveUp={() => moveBox("lesson", "up")}
+                  onMoveDown={() => moveBox("lesson", "down")}
+                >
+                  {activeLesson ? (
+                    <LessonCard
+                      item={activeLesson}
+                      onClose={() => {
+                        setPinned(null);
+                        setCurrentStudy(null);
+                      }}
+                      fontStudy={fontStudy}
+                      onFontChange={(f) => {
+                        setFontStudy(f);
+                        localStorage.setItem("lextype-font-study", f);
+                      }}
+                    />
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border/70 p-6 text-center text-muted-foreground">
+                      <p className="text-sm font-medium mb-1">🎓 Nenhuma virada de chave carregada no momento.</p>
+                      <p className="text-xs mb-3 text-muted-foreground/80">
+                        No modo <strong>Estudos Jurídicos</strong> ou <strong>Lei Seca</strong>, este painel exibirá o conceito estruturado, critério decisivo e o caso prático correspondente.
+                      </p>
+                      <button
+                        onClick={() => {
+                          changeMode("estudos");
+                          void nextStudy([], selectedKeys, effectiveArea);
+                        }}
+                        className="rounded-md bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90"
+                      >
+                        Iniciar Aula de {effectiveArea}
+                      </button>
+                    </div>
+                  )}
+                </MovableCard>
+              );
+            }
+
+            if (boxId === "keyboard") {
+              return (
+                <MovableCard
+                  key="keyboard"
+                  id="keyboard"
+                  title={`Teclado Virtual (${keyboardLayout.toUpperCase()})`}
+                  icon="⌨️"
+                  canMoveUp={boxOrder.indexOf("keyboard") > 0}
+                  canMoveDown={boxOrder.indexOf("keyboard") < boxOrder.length - 1}
+                  onMoveUp={() => moveBox("keyboard", "up")}
+                  onMoveDown={() => moveBox("keyboard", "down")}
+                >
+                  <Keyboard
+                    nextKeys={nextKeys}
+                    stats={keyStats}
+                    selectedKeys={[]}
+                    flash={flash}
+                    layout={keyboardLayout}
+                    scale={uiScale}
+                    mode={keyboardMode}
                   />
-                </div>
-                <div className="mb-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-mono-type text-sm">
-                  <span className="text-muted-foreground">
-                    PPM <span className="font-bold text-gold">{liveWpm}</span>
-                  </span>
-                  <span className="text-muted-foreground">
-                    Precisão <span className="font-bold text-foreground">{liveAcc}%</span>
-                  </span>
-                  <span className="text-muted-foreground">
-                    Tempo <span className="font-bold text-foreground">{elapsed.toFixed(0)}s</span>
-                  </span>
-                  <span
-                    key={comboPulse}
-                    className={cn(
-                      "animate-combo text-muted-foreground",
-                      e.combo >= 10 && "text-gold",
+                  <div className="mt-4 flex flex-wrap justify-center gap-5 text-xs text-muted-foreground">
+                    {keyboardMode === "heatmap" ? (
+                      <>
+                        <Legend cls="bg-success/40" label="dominada" />
+                        <Legend cls="bg-gold/30" label="em progresso" />
+                        <Legend cls="bg-destructive/40" label="precisa de treino" />
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        Zonas coloridas por dedo. A tecla atual acende com brilho vibrante.
+                      </span>
                     )}
-                  >
-                    Combo <span className="font-bold">{e.combo}</span>
-                    {e.combo >= 25 ? " 🔥" : ""}
-                    {e.combo >= 50 ? "🔥" : ""}
-                  </span>
-                </div>
-                {studyLoading ? (
-                  <p className="py-6 text-center text-muted-foreground">
-                    O professor está preparando a aula de {effectiveArea}…
-                  </p>
-                ) : (
-                  <p
-                    className={cn(
-                      "font-mono-type leading-relaxed tracking-wide transition-all",
-                      TYPING_FONT_CLASSES[fontTyping],
-                      lineCount === 1 && "overflow-hidden",
-                    )}
-                  >
-                    {e.text.split("").map((ch, i) => {
-                      const isErrorMark = e.marks[i] === true;
-                      return (
-                        <span
-                          key={i}
+                  </div>
+                </MovableCard>
+              );
+            }
+
+            if (boxId === "keys") {
+              return (
+                <MovableCard
+                  key="keys"
+                  id="keys"
+                  title={mode === "automatico" ? "Diagnóstico de Teclas Críticas" : "Teclas-Alvo do Treino"}
+                  icon="🎯"
+                  canMoveUp={boxOrder.indexOf("keys") > 0}
+                  canMoveDown={boxOrder.indexOf("keys") < boxOrder.length - 1}
+                  onMoveUp={() => moveBox("keys", "up")}
+                  onMoveDown={() => moveBox("keys", "down")}
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                      {mode === "automatico"
+                        ? "Marque as teclas em que você tem mais dificuldade"
+                        : "Teclas selecionadas para repetição"}
+                    </h2>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(KEY_GROUPS).map(([name, g]) => (
+                        <button
+                          key={name}
+                          onClick={() => toggleGroup(g)}
                           className={cn(
-                            i < pos &&
-                              (isErrorMark
-                                ? "rounded-sm bg-destructive/25 text-destructive font-bold underline"
-                                : "text-muted-foreground/40"),
-                            i === pos &&
-                              (prefs.stopOnError && e.wrongAt === i
-                                ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake"
-                                : "rounded-sm bg-gold/30 text-gold animate-caret"),
-                            i > pos && "text-foreground",
+                            "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
+                            g.every((k) => selectedKeys.includes(k))
+                              ? "border-gold bg-gold/15 text-gold"
+                              : "border-border bg-secondary text-secondary-foreground hover:text-gold",
                           )}
                         >
-                          {ch === " " && i === pos ? "␣" : ch}
-                        </span>
-                      );
-                    })}
-                  </p>
-                )}
-                <p className="mt-5 text-center text-xs text-muted-foreground">
-                  {focused
-                    ? prefs.stopOnError
-                      ? "Modo estrito: o cursor trava na letra errada até você acertar."
-                      : "Modo fluido: continue digitando e use Backspace para retornar e corrigir as letras em vermelho."
-                    : "🎯 A velocidade surge da precisão. Clique ou toque aqui para começar."}
-                </p>
-                <input
-                  ref={inputRef}
-                  aria-label="Área de digitação"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  autoComplete="off"
-                  spellCheck={false}
-                  enterKeyHint="next"
-                  className="absolute inset-0 h-full w-full cursor-text opacity-0"
-                  onFocus={() => setFocused(true)}
-                  onBlur={() => setFocused(false)}
-                  onCompositionStart={() => (composing.current = true)}
-                  onCompositionEnd={(ev) => {
-                    composing.current = false;
-                    handleInput(ev.currentTarget, true);
-                  }}
-                  onInput={(ev) => handleInput(ev.currentTarget, false)}
-                />
-              </>
-            )}
-          </section>
+                          {name}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => applyKeys(TRAINABLE_KEYS)}
+                        className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-gold"
+                      >
+                        Todas
+                      </button>
+                      <button
+                        onClick={() => applyKeys([])}
+                        className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-destructive"
+                      >
+                        Limpar
+                      </button>
+                    </div>
+                  </div>
+                  <Keyboard
+                    stats={keyStats}
+                    selectedKeys={selectedKeys}
+                    onToggle={toggleKey}
+                    layout={keyboardLayout}
+                    compact
+                  />
+                </MovableCard>
+              );
+            }
 
-          {/* Aula e Virada de chave em destaque (renderizada aqui quando split) */}
-          {layoutSplit && pinned && (
-            <LessonCard
-              item={pinned}
-              onClose={() => setPinned(null)}
-              fontStudy={fontStudy}
-              onFontChange={(f) => {
-                setFontStudy(f);
-                localStorage.setItem("lextype-font-study", f);
-              }}
-            />
-          )}
+            return null;
+          })}
         </div>
-
-        {/* Controles rápidos */}
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            onClick={() => setRepeat((r) => !r)}
-            aria-pressed={repeat}
-            title="Repetir a mesma frase deliberadamente"
-            className={cn(
-              "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-              repeat
-                ? "border-gold bg-gold text-gold-foreground"
-                : "border-border bg-card text-muted-foreground hover:text-foreground",
-            )}
-          >
-            🔁 Repetir frase {repeat ? "ligado" : "desligado"}
-          </button>
-          {!result && e.text && (
-            <button
-              onClick={handleRestartLine}
-              className="rounded-full border border-border bg-card px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-              ↺ Recomeçar esta
-            </button>
-          )}
-        </div>
-
-        {/* Aula e Virada de chave em destaque (quando empilhado) */}
-        {!layoutSplit && pinned && (
-          <LessonCard
-            item={pinned}
-            onClose={() => setPinned(null)}
-            fontStudy={fontStudy}
-            onFontChange={(f) => {
-              setFontStudy(f);
-              localStorage.setItem("lextype-font-study", f);
-            }}
-          />
-        )}
-
-        {/* Teclado Virtual com suporte a Redimensionamento */}
-        <section className="rounded-xl border border-border bg-card p-4 sm:p-6 resize-y overflow-auto min-h-[260px]">
-          <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-semibold uppercase tracking-wider">
-              Teclado Virtual ({keyboardLayout.toUpperCase()})
-            </span>
-            <div className="flex items-center gap-3">
-              <span className="hidden sm:inline">
-                Pressione e arraste a borda inferior para ajustar o tamanho
-              </span>
-            </div>
-          </div>
-          <Keyboard
-            nextKeys={nextKeys}
-            stats={keyStats}
-            selectedKeys={[]}
-            flash={flash}
-            layout={keyboardLayout}
-            scale={uiScale}
-            mode={keyboardMode}
-          />
-          <div className="mt-4 flex flex-wrap justify-center gap-5 text-xs text-muted-foreground">
-            {keyboardMode === "heatmap" ? (
-              <>
-                <Legend cls="bg-success/40" label="dominada" />
-                <Legend cls="bg-gold/30" label="em progresso" />
-                <Legend cls="bg-destructive/40" label="precisa de treino" />
-              </>
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                Zonas coloridas por dedo. A tecla atual acende com brilho vibrante.
-              </span>
-            )}
-          </div>
-        </section>
-
-        {/* Seleção de teclas */}
-        <section
-          className={cn(
-            "rounded-xl border border-border bg-card p-4 transition-opacity duration-500 sm:p-6",
-            inFlow && "opacity-25 hover:opacity-100",
-          )}
-        >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {mode === "automatico"
-                ? "Marque as teclas em que você tem mais dificuldade"
-                : "Teclas-alvo do treino"}
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(KEY_GROUPS).map(([name, g]) => (
-                <button
-                  key={name}
-                  onClick={() => toggleGroup(g)}
-                  className={cn(
-                    "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
-                    g.every((k) => selectedKeys.includes(k))
-                      ? "border-gold bg-gold/15 text-gold"
-                      : "border-border bg-secondary text-secondary-foreground hover:text-gold",
-                  )}
-                >
-                  {name}
-                </button>
-              ))}
-              <button
-                onClick={() => applyKeys(TRAINABLE_KEYS)}
-                className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-gold"
-              >
-                Todas
-              </button>
-              <button
-                onClick={() => applyKeys([])}
-                className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-destructive"
-              >
-                Limpar
-              </button>
-            </div>
-          </div>
-          <Keyboard
-            stats={keyStats}
-            selectedKeys={selectedKeys}
-            onToggle={toggleKey}
-            layout={keyboardLayout}
-            compact
-          />
-        </section>
       </main>
       )}
     </div>

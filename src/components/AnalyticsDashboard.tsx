@@ -13,24 +13,27 @@ import {
 import { cn } from "@/lib/utils";
 
 interface AnalyticsDashboardProps {
-  stats: KeyStats;
-  xp: number;
-  bestWpm: number;
-  streak: number;
-  practiceTodaySeconds: number;
-  onTrainWeakKeys: (keys: string[]) => void;
-  onSwitchToPractice: () => void;
+  stats?: KeyStats;
+  xp?: number;
+  bestWpm?: number;
+  streak?: number;
+  practiceTodaySeconds?: number;
+  onTrainWeakKeys?: (keys: string[]) => void;
+  onSwitchToPractice?: () => void;
+  onBackToPractice?: () => void;
 }
 
 export function AnalyticsDashboard({
-  stats,
-  xp,
-  bestWpm,
-  streak,
-  practiceTodaySeconds,
+  stats = {},
+  xp = 0,
+  bestWpm = 0,
+  streak = 0,
+  practiceTodaySeconds = 0,
   onTrainWeakKeys,
   onSwitchToPractice,
+  onBackToPractice,
 }: AnalyticsDashboardProps) {
+  const handleReturnToPractice = onSwitchToPractice || onBackToPractice || (() => {});
   const [chartMetric, setChartMetric] = useState<"both" | "wpm" | "accuracy">("both");
   const sessions = useMemo(() => loadSessions(), []);
 
@@ -593,7 +596,7 @@ export function AnalyticsDashboard({
             <span>📥</span> Exportar Histórico (JSON)
           </button>
           <button
-            onClick={onSwitchToPractice}
+            onClick={handleReturnToPractice}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
           >
             <span>⌨️</span> Voltar ao Treino

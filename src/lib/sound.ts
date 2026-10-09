@@ -4,34 +4,49 @@ export type SoundProfile = "cherry-blue" | "cherry-brown" | "cherry-red" | "type
 
 export interface SoundProfileInfo {
   id: SoundProfile;
+  number: number;
   name: string;
+  label: string;
   desc: string;
+  description: string;
   icon: string;
 }
 
 export const SOUND_PROFILES: SoundProfileInfo[] = [
   {
     id: "cherry-blue",
+    number: 1,
     name: "Cherry MX Blue",
+    label: "1. 🔵 Cherry MX Blue (Clicky)",
     desc: "Clicky: estalo nítido, agudo e metálico com alta resposta tátil",
+    description: "Clicky: estalo nítido, agudo e metálico com alta resposta tátil",
     icon: "🔵",
   },
   {
     id: "cherry-brown",
+    number: 2,
     name: "Cherry MX Brown",
+    label: "2. 🟤 Cherry MX Brown (Tátil)",
     desc: "Tactile: batida suave, aveludada e equilibrada para digitação contínua",
+    description: "Tactile: batida suave, aveludada e equilibrada para digitação contínua",
     icon: "🟤",
   },
   {
     id: "cherry-red",
+    number: 3,
     name: "Cherry MX Red / Black",
+    label: "3. 🔴 Cherry MX Red / Black (Linear)",
     desc: "Linear: batida grave, encorpada e amortecida ('thocky')",
+    description: "Linear: batida grave, encorpada e amortecida ('thocky')",
     icon: "🔴",
   },
   {
     id: "typewriter",
+    number: 4,
     name: "Máquina de Escrever",
+    label: "4. 📠 Máquina de Escrever Vintage",
     desc: "Vintage: impacto de alavanca mecânica com campainha clássica de retorno",
+    description: "Vintage: impacto de alavanca mecânica com campainha clássica de retorno",
     icon: "📠",
   },
 ];
