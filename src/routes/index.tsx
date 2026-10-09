@@ -1547,11 +1547,16 @@ function Index() {
                     className="max-w-[190px] sm:max-w-[250px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
                   >
                     <option value="random">🎲 Aleatório ({availableLeiSecaItems.length} disp.)</option>
-                    {availableLeiSecaItems.map((item) => (
+                    {availableLeiSecaItems.slice(0, 250).map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.dispositivo} - {item.diploma}
                       </option>
                     ))}
+                    {availableLeiSecaItems.length > 250 && (
+                      <option disabled value="">
+                        ... e mais {availableLeiSecaItems.length - 250} (selecione o Diploma acima para filtrar)
+                      </option>
+                    )}
                   </select>
                 </div>
               </div>

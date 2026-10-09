@@ -1,3 +1,4 @@
+import { useState, useMemo, useEffect } from "react";
 import {
   LEI_SECA_BANK,
   LEI_SECA_EIXOS,
@@ -19,6 +20,7 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
   const [selectedEixo, setSelectedEixo] = useState<LeiSecaEixo>("Todos os Eixos");
   const [selectedDiploma, setSelectedDiploma] = useState<string>("Todos os Diplomas");
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleCount, setVisibleCount] = useState(40);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(() => {
     if (typeof localStorage === "undefined") return null;
@@ -26,11 +28,20 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
     return last ? `Última sincronização com portais oficiais: ${last}` : null;
   });
 
+  // Reseta paginação quando o usuário altera filtros de busca
+  useEffect(() => {
+    setVisibleCount(40);
+  }, [selectedEixo, selectedDiploma, searchTerm]);
+
   const availableDiplomas = useMemo(() => getDiplomasList(), []);
 
   const filteredItems = useMemo(() => {
     return filterLeiSeca(selectedEixo, searchTerm, selectedDiploma);
   }, [selectedEixo, searchTerm, selectedDiploma]);
+
+  const visibleItems = useMemo(() => {
+    return filteredItems.slice(0, visibleCount);
+  }, [filteredItems, visibleCount]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -145,16 +156,17 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
       </div>
 
       {/* Contagem de Dispositivos */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>
-          Exibindo <strong>{filteredItems.length}</strong> dispositivo(s) normativo(s)
+          Exibindo <strong>{visibleItems.length}</strong> de <strong>{filteredItems.length}</strong> dispositivo(s) normativo(s)
+          {selectedDiploma !== "Todos os Diplomas" && ` em ${selectedDiploma}`}
         </span>
-        <span className="italic">Clique em "⌨️ Digitar Este Artigo" para praticar no motor de digitação</span>
+        <span className="italic">Clique em "⌨️ Digitar Artigo" para praticar no motor de digitação</span>
       </div>
 
       {/* Grid de Dispositivos de Lei Seca */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {filteredItems.map((item) => (
+        {visibleItems.map((item) => (
           <div
             key={item.id}
             className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-background/50 p-4 transition-all hover:border-gold/60 hover:shadow-md"
@@ -224,6 +236,24 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
           </div>
         ))}
       </div>
+
+      {/* Paginação / Carregamento progressivo para fluidez 60 FPS */}
+      {filteredItems.length > visibleCount && (
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4 border-t border-border/60">
+          <button
+            onClick={() => setVisibleCount((prev) => Math.min(prev + 40, filteredItems.length))}
+            className="inline-flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-5 py-2.5 text-xs font-semibold text-gold transition hover:bg-gold/20 shadow-sm active:scale-95"
+          >
+            <span>📜</span> Exibir mais 40 dispositivos (+40) — Restam {filteredItems.length - visibleCount}
+          </button>
+          <button
+            onClick={() => setVisibleCount(filteredItems.length)}
+            className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition hover:border-gold/30"
+          >
+            Carregar todos ({filteredItems.length} dispositivos)
+          </button>
+        </div>
+      )}
     </div>
   );
 }

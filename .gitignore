@@ -37,6 +37,7 @@ agent/
 data/
 skills/
 skills-lock.json
+vade_mecum/*.pdf
 .*
 !.gitignore
 !.vscode
