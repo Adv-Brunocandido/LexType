@@ -131,7 +131,17 @@ function Index() {
   const [mode, setMode] = useState<FullMode>("automatico");
   const [area, setArea] = useState(AREAS[0]!);
   const [customArea, setCustomArea] = useState("");
-  const [lineCount, setLineCount] = useState(2);
+  const [lineCount, setLineCount] = useState<number>(() => {
+    if (typeof localStorage === "undefined") return 2;
+    try {
+      const s = localStorage.getItem("lextype-lines");
+      if (s) {
+        const n = parseInt(s, 10);
+        if (!isNaN(n) && n >= 1 && n <= 10) return n;
+      }
+    } catch {}
+    return 2;
+  });
   const [reference, setReference] = useState<{ name: string; text: string } | null>(null);
   const [repeat, setRepeat] = useState(false);
   const [pinned, setPinned] = useState<StudyItem | null>(null);
@@ -234,8 +244,17 @@ function Index() {
   }, []);
 
   const nextStudy = useCallback(
-    async (queue: StudyItem[], keys: string[], ar: string) => {
+    async (queue: StudyItem[], keys: string[], ar: string, countOverride?: number) => {
+      const activeCount = countOverride ?? lineCount;
       if (queue.length) {
+        if (activeCount > 1 && queue.length >= 2) {
+          const batch = queue.slice(0, activeCount);
+          const rest = queue.slice(activeCount);
+          setStudyQueue(rest);
+          setCurrentStudy(batch[0]!);
+          loadText(batch.map((b) => b.linha).join(" "));
+          return;
+        }
         const [item, ...rest] = queue;
         setStudyQueue(rest);
         setCurrentStudy(item!);
@@ -251,25 +270,42 @@ function Index() {
             area: ar,
             keys,
             seen: seenTerms.current.slice(-20),
-            count: lineCount,
+            count: activeCount,
             reference: reference?.text,
           },
         });
-        const items = r.itens.length ? r.itens : offlineStudy(ar, lineCount, seenTerms.current);
+        const items = r.itens.length ? r.itens : offlineStudy(ar, activeCount, seenTerms.current);
         if (r.error || !r.itens.length)
           setStudyError(`${r.error ?? "IA indisponível."} Usando o banco offline do professor.`);
         items.forEach((i) => seenTerms.current.push(i.termo));
-        const [item, ...rest] = items;
-        setStudyQueue(rest);
-        setCurrentStudy(item!);
-        loadText(item!.linha);
+        if (activeCount > 1 && items.length >= 2) {
+          const batch = items.slice(0, activeCount);
+          const rest = items.slice(activeCount);
+          setStudyQueue(rest);
+          setCurrentStudy(batch[0]!);
+          loadText(batch.map((b) => b.linha).join(" "));
+        } else {
+          const [item, ...rest] = items;
+          setStudyQueue(rest);
+          setCurrentStudy(item!);
+          loadText(item!.linha);
+        }
       } catch {
         setStudyError("Sem conexão com a IA. Usando o banco offline do professor.");
-        const [item, ...rest] = offlineStudy(ar, lineCount, seenTerms.current);
-        seenTerms.current.push(item!.termo);
-        setStudyQueue(rest);
-        setCurrentStudy(item!);
-        loadText(item!.linha);
+        const items = offlineStudy(ar, activeCount, seenTerms.current);
+        items.forEach((i) => seenTerms.current.push(i.termo));
+        if (activeCount > 1 && items.length >= 2) {
+          const batch = items.slice(0, activeCount);
+          const rest = items.slice(activeCount);
+          setStudyQueue(rest);
+          setCurrentStudy(batch[0]!);
+          loadText(batch.map((b) => b.linha).join(" "));
+        } else {
+          const [item, ...rest] = items;
+          setStudyQueue(rest);
+          setCurrentStudy(item!);
+          loadText(item!.linha);
+        }
       } finally {
         setStudyLoading(false);
       }
@@ -283,11 +319,12 @@ function Index() {
       keys: string[],
       stats: KeyStats,
       lvl: number,
-      opts?: { area?: string; freshStudy?: boolean },
+      opts?: { area?: string; freshStudy?: boolean; lines?: number },
     ) => {
+      const activeLines = opts?.lines ?? lineCount;
       if (m === "estudos") {
         const q = opts?.freshStudy ? [] : studyQueue;
-        void nextStudy(q, keys, opts?.area ?? effectiveArea);
+        void nextStudy(q, keys, opts?.area ?? effectiveArea, activeLines);
         return;
       }
       setCurrentStudy(null);
@@ -296,7 +333,7 @@ function Index() {
         setRoute(r);
         loadText(
           enrichText(
-            generateText({ mode: "palavras", keys: r.target, weak: r.weak, level: lvl }),
+            generateText({ mode: "palavras", keys: r.target, weak: r.weak, level: lvl, lines: activeLines }),
             prefsRef.current,
           ),
         );
@@ -304,13 +341,13 @@ function Index() {
         setRoute(null);
         loadText(
           enrichText(
-            generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl }),
+            generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl, lines: activeLines }),
             prefsRef.current,
           ),
         );
       }
     },
-    [effectiveArea, enrichText, loadText, nextStudy, studyQueue],
+    [effectiveArea, enrichText, lineCount, loadText, nextStudy, studyQueue],
   );
 
   useEffect(() => {
@@ -490,6 +527,34 @@ function Index() {
     }
   };
 
+  const handleLineCountChange = useCallback(
+    (updater: number | ((prev: number) => number)) => {
+      setLineCount((prev) => {
+        const nextVal = typeof updater === "function" ? updater(prev) : updater;
+        const clamped = Math.max(1, Math.min(10, nextVal));
+        if (typeof localStorage !== "undefined") {
+          try {
+            localStorage.setItem("lextype-lines", String(clamped));
+          } catch {}
+        }
+        if (!running) {
+          setTimeout(() => {
+            reset(mode, selectedKeys, keyStats, level, { lines: clamped });
+          }, 0);
+        }
+        return clamped;
+      });
+    },
+    [keyStats, level, mode, reset, running, selectedKeys],
+  );
+
+  const processCharRef = useRef(processChar);
+  processCharRef.current = processChar;
+  const handleBackspaceRef = useRef(handleBackspace);
+  handleBackspaceRef.current = handleBackspace;
+  const handleRestartLineRef = useRef(handleRestartLine);
+  handleRestartLineRef.current = handleRestartLine;
+
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       const t = ev.target as HTMLElement;
@@ -501,12 +566,12 @@ function Index() {
       }
       if (ev.key === "Backspace") {
         ev.preventDefault();
-        handleBackspace();
+        handleBackspaceRef.current();
         return;
       }
       if (ev.key === "Tab") {
         ev.preventDefault();
-        handleRestartLine();
+        handleRestartLineRef.current();
         return;
       }
       if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey && !ev.altKey && !ev.isComposing) {
@@ -514,12 +579,12 @@ function Index() {
         if (inputRef.current && document.activeElement !== inputRef.current) {
           inputRef.current.focus();
         }
-        processChar(ev.key);
+        processCharRef.current(ev.key);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [result, processChar]);
+  }, [result]);
 
   const applyTheme = (t: ThemeMode) => {
     setTheme(t);
@@ -923,8 +988,8 @@ function Index() {
               </label>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setLineCount((n) => Math.max(2, n - 1))}
-                  className="h-7 w-7 rounded-md border border-border bg-card"
+                  onClick={() => handleLineCountChange((n) => Math.max(1, n - 1))}
+                  className="h-7 w-7 rounded-md border border-border bg-card hover:bg-secondary transition-colors"
                   aria-label="Menos linhas"
                 >
                   −
@@ -933,8 +998,8 @@ function Index() {
                   {lineCount}
                 </span>
                 <button
-                  onClick={() => setLineCount((n) => Math.min(10, n + 1))}
-                  className="h-7 w-7 rounded-md border border-border bg-card"
+                  onClick={() => handleLineCountChange((n) => Math.min(10, n + 1))}
+                  className="h-7 w-7 rounded-md border border-border bg-card hover:bg-secondary transition-colors"
                   aria-label="Mais linhas"
                 >
                   +
@@ -985,8 +1050,12 @@ function Index() {
         {/* Área de digitação redimensionável */}
         <section
           onClick={() => inputRef.current?.focus()}
+          style={{
+            minHeight: `${Math.max(9, 5.5 + lineCount * 2.8)}rem`,
+            maxHeight: "75vh",
+          }}
           className={cn(
-            "relative rounded-xl border bg-card p-5 transition-shadow sm:p-8 resize-y overflow-auto min-h-[220px]",
+            "relative rounded-xl border bg-card p-5 transition-all duration-300 sm:p-8 resize-y overflow-auto",
             focused ? "border-gold/50 ring-2 ring-ring/30" : "border-border",
           )}
         >
@@ -1260,24 +1329,36 @@ function LessonCard({ item, onClose }: { item: StudyItem; onClose: () => void })
         ✕
       </button>
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wider text-gold">
-          Semântica Jurídica
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded bg-gold/20 px-2.5 py-1 text-xs font-bold text-gold uppercase tracking-wider">
+            {item.virada.titulo || item.termo}
+          </span>
+          <span className="text-xs text-muted-foreground font-mono-type">{item.semantica}</span>
         </div>
-        <p className="mt-1 pr-6 text-base leading-relaxed">
-          <span className="font-mono-type font-bold text-foreground">{item.termo}</span> —{" "}
-          {item.semantica}
-        </p>
       </div>
-      <div className="border-t border-gold/20 pt-4">
-        <div className="text-xs font-semibold uppercase tracking-wider text-gold">
-          Virada de Chave Prática · {item.virada.titulo}
+      {item.virada.conceito && (
+        <div className="rounded-lg bg-card/60 p-3.5 border border-border/60">
+          <div className="text-xs font-bold uppercase tracking-wider text-gold mb-1">
+            📖 Conceito & Distinção
+          </div>
+          <p className="text-sm leading-relaxed text-foreground">
+            {item.virada.conceito}
+          </p>
         </div>
-        <p className="mt-2 text-base leading-relaxed">
-          <span className="font-semibold text-foreground">Raciocínio: </span>
+      )}
+      <div className="rounded-lg bg-card/60 p-3.5 border border-border/60">
+        <div className="text-xs font-bold uppercase tracking-wider text-gold mb-1">
+          💡 Virada de Chave (Critério Decisivo)
+        </div>
+        <p className="text-sm leading-relaxed text-foreground">
           {item.virada.raciocinio}
         </p>
-        <p className="mt-2 text-base leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">Exemplo no Caso Concreto: </span>
+      </div>
+      <div className="rounded-lg bg-card/60 p-3.5 border border-border/60">
+        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+          ⚖️ Exemplo no Caso Concreto
+        </div>
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {item.virada.exemplo}
         </p>
       </div>

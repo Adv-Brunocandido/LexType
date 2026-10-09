@@ -38,13 +38,25 @@ function tone(
   o.stop(t + dur + 0.02);
 }
 
+let keyBuffers: AudioBuffer[] | null = null;
+
+function getKeyBuffer(a: AudioContext): AudioBuffer {
+  if (!keyBuffers || keyBuffers.length === 0) {
+    const len = Math.floor(a.sampleRate * 0.03);
+    keyBuffers = Array.from({ length: 4 }, () => {
+      const buf = a.createBuffer(1, len, a.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+      return buf;
+    });
+  }
+  return keyBuffers[Math.floor(Math.random() * keyBuffers.length)]!;
+}
+
 export function playKey() {
   const a = ac();
   if (!a) return;
-  const len = Math.floor(a.sampleRate * 0.03);
-  const buf = a.createBuffer(1, len, a.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+  const buf = getKeyBuffer(a);
   const src = a.createBufferSource();
   src.buffer = buf;
   const f = a.createBiquadFilter();

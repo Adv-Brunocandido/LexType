@@ -49,12 +49,15 @@ export function generateText(opts: {
   keys: string[];
   weak?: string[];
   level?: number;
+  lines?: number;
 }): string {
-  const { mode, weak = [], level = 3 } = opts;
+  const { mode, weak = [], level = 3, lines = 2 } = opts;
   const keys = opts.keys.length ? opts.keys : KEY_GROUPS.Central!;
   const target = new Set(keys);
   const weakSet = new Set(weak);
-  const count = 5 + level;
+  const safeLines = Math.max(1, Math.min(10, lines));
+  const baseCount = 4 + Math.floor(level * 0.6);
+  const count = safeLines === 1 ? Math.max(4, baseCount) : Math.round(baseCount * safeLines * 0.8);
 
   const drill = () => {
     const len = 2 + Math.floor(Math.random() * (1 + Math.floor(level / 3)));
@@ -64,7 +67,7 @@ export function generateText(opts: {
   };
 
   if (mode === "aquecimento") {
-    return Array.from({ length: Math.round(count * 1.4) }, drill).join(" ");
+    return Array.from({ length: Math.round(count * 1.3) }, drill).join(" ");
   }
 
   if (mode === "frases") {
@@ -72,10 +75,10 @@ export function generateText(opts: {
       (p) => [p, score(p, target, weakSet) + 0.01] as [string, number],
     )
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 8);
-    const n = level >= 6 ? 3 : 2;
+      .slice(0, 12);
+    const n = Math.max(1, Math.min(8, safeLines));
     const out = new Set<string>();
-    while (out.size < n) out.add(weightedPick(ranked));
+    while (out.size < n && out.size < ranked.length) out.add(weightedPick(ranked));
     return [...out].join(" ");
   }
 

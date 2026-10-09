@@ -5,7 +5,12 @@ export interface StudyItem {
   linha: string;
   termo: string;
   semantica: string;
-  virada: { titulo: string; raciocinio: string; exemplo: string };
+  virada: {
+    titulo: string;
+    conceito?: string;
+    raciocinio: string;
+    exemplo: string;
+  };
 }
 
 const schema = {
@@ -29,6 +34,7 @@ const schema = {
             required: ["titulo", "raciocinio", "exemplo"],
             properties: {
               titulo: { type: "string" },
+              conceito: { type: "string" },
               raciocinio: { type: "string" },
               exemplo: { type: "string" },
             },
@@ -40,13 +46,13 @@ const schema = {
 };
 
 export const generateStudy = createServerFn({ method: "POST" })
-  .inputValidator((d) =>
+  .validator((d) =>
     z
       .object({
         area: z.string().min(2).max(120),
         keys: z.array(z.string().max(2)).max(60),
         seen: z.array(z.string().max(120)).max(30),
-        count: z.number().int().min(2).max(10),
+        count: z.number().int().min(1).max(10),
         reference: z.string().max(30000).optional(),
       })
       .parse(d),
