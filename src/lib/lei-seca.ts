@@ -731,18 +731,39 @@ export function getDiplomasList(): string[] {
   return ["Todos os Diplomas", ...Array.from(set)];
 }
 
+export function normalizeSearchTerm(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\bartigo\b/g, "art")
+    .replace(/\bparagrafo\b/g, "par")
+    .replace(/\binciso\b/g, "inc")
+    .replace(/\bsumula vinculante\b/g, "sv")
+    .replace(/\bsumula\b/g, "sum")
+    .replace(/[º°ª\.\,\;\:\-\_\(\)\[\]\/\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function filterLeiSeca(eixo?: string, query?: string, diploma?: string): LeiSecaItem[] {
   const bank = getStoredLeiSeca();
+  const rawQ = (query || "").trim();
+  const queryTokens = rawQ ? normalizeSearchTerm(rawQ).split(" ").filter(Boolean) : [];
+
   return bank.filter((item) => {
-    const matchesEixo = !eixo || eixo === "Todos os Eixos" || item.eixo === eixo;
     const matchesDiploma = !diploma || diploma === "Todos os Diplomas" || item.diploma === diploma;
-    const matchesQuery =
-      !query ||
-      item.diploma.toLowerCase().includes(query.toLowerCase()) ||
-      item.dispositivo.toLowerCase().includes(query.toLowerCase()) ||
-      item.texto.toLowerCase().includes(query.toLowerCase()) ||
-      item.explicacao.toLowerCase().includes(query.toLowerCase());
-    return matchesEixo && matchesDiploma && matchesQuery;
+    const matchesEixo = !eixo || eixo === "Todos os Eixos" || item.eixo === eixo;
+
+    if (queryTokens.length > 0) {
+      const searchTarget = normalizeSearchTerm(
+        `${item.dispositivo} ${item.diploma} ${item.texto} ${item.explicacao} ${item.eixo} ${item.disciplina}`
+      );
+      const matchesAllTokens = queryTokens.every((token) => searchTarget.includes(token));
+      if (!matchesAllTokens) return false;
+    }
+
+    return matchesDiploma && matchesEixo;
   });
 }
 
@@ -836,5 +857,30 @@ export function getRandomLeiSecaItem(eixo?: string, seen: string[] = [], diploma
   const randomIndex = Math.floor(Math.random() * targetPool.length);
   return targetPool[randomIndex]!;
 }
+
+export function getPreviousLeiSecaItem(
+  currentId?: string,
+  eixo?: string,
+  seen: string[] = [],
+  diploma?: string,
+): LeiSecaItem {
+  const filtered = filterLeiSeca(eixo, undefined, diploma);
+  const pool = filtered.length > 0 ? filtered : getStoredLeiSeca();
+
+  if (seen.length > 1) {
+    const prevSeenId = seen[seen.length - 2];
+    const prevItem = pool.find((item) => item.id === prevSeenId);
+    if (prevItem) return prevItem;
+  }
+
+  if (currentId) {
+    const currentIndex = pool.findIndex((item) => item.id === currentId);
+    if (currentIndex > 0) return pool[currentIndex - 1]!;
+    if (currentIndex === 0) return pool[pool.length - 1]!;
+  }
+
+  return pool[0]!;
+}
+
 
 

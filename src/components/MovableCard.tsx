@@ -44,25 +44,45 @@ export function MovableCard({
   const [isMinimized, setIsMinimized] = useState(false);
 
   const handleWidthCycle = (direction: "left" | "right") => {
-    const sequence: CardWidth[] = ["50%", "70%", "85%", "100%"];
-    const currentIdx = sequence.indexOf(width);
-    let nextIdx = currentIdx;
-
     if (direction === "left") {
-      // Alargar pela esquerda: expande largura e alinha à esquerda ou centro
-      nextIdx = Math.min(sequence.length - 1, currentIdx + 1);
-      setAlign("left");
-      localStorage.setItem(`lextype-card-align-${id}`, "left");
+      if (width === "100%") {
+        setWidth("85%");
+        setAlign("left");
+        localStorage.setItem(`lextype-card-width-${id}`, "85%");
+        localStorage.setItem(`lextype-card-align-${id}`, "left");
+      } else if (align === "right") {
+        setAlign("center");
+        localStorage.setItem(`lextype-card-align-${id}`, "center");
+      } else if (align === "center") {
+        setAlign("left");
+        localStorage.setItem(`lextype-card-align-${id}`, "left");
+      } else {
+        const widths: CardWidth[] = ["85%", "70%", "50%"];
+        const curr = widths.indexOf(width);
+        const next = widths[(curr + 1) % widths.length]!;
+        setWidth(next);
+        localStorage.setItem(`lextype-card-width-${id}`, next);
+      }
     } else {
-      // Alargar pela direita: expande largura e alinha à direita ou centro
-      nextIdx = Math.min(sequence.length - 1, currentIdx + 1);
-      setAlign("right");
-      localStorage.setItem(`lextype-card-align-${id}`, "right");
+      if (width === "100%") {
+        setWidth("85%");
+        setAlign("right");
+        localStorage.setItem(`lextype-card-width-${id}`, "85%");
+        localStorage.setItem(`lextype-card-align-${id}`, "right");
+      } else if (align === "left") {
+        setAlign("center");
+        localStorage.setItem(`lextype-card-align-${id}`, "center");
+      } else if (align === "center") {
+        setAlign("right");
+        localStorage.setItem(`lextype-card-align-${id}`, "right");
+      } else {
+        const widths: CardWidth[] = ["85%", "70%", "50%"];
+        const curr = widths.indexOf(width);
+        const next = widths[(curr + 1) % widths.length]!;
+        setWidth(next);
+        localStorage.setItem(`lextype-card-width-${id}`, next);
+      }
     }
-
-    const nextWidth = sequence[nextIdx]!;
-    setWidth(nextWidth);
-    localStorage.setItem(`lextype-card-width-${id}`, nextWidth);
   };
 
   const handleToggleFullWidth = () => {
@@ -87,7 +107,7 @@ export function MovableCard({
     >
       <div className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
         {/* Barra Superior de Reposicionamento e Alargamento */}
-        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5 border-b border-border/50 pb-2.5">
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-2.5">
           <div className="flex items-center gap-2">
             <span
               className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-gold text-xs select-none"
@@ -100,46 +120,55 @@ export function MovableCard({
               {title}
             </span>
             {width !== "100%" && (
-              <span className="rounded bg-gold/15 px-1.5 py-0.2 text-[10px] font-bold text-gold">
-                {width}
+              <span className="rounded bg-gold/15 px-1.5 py-0.5 text-[10px] font-bold text-gold">
+                {width} ({align})
               </span>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             {extraHeaderControls}
 
-            {/* Controles de Alargamento (Esquerda / Direita) */}
-            <div className="flex items-center rounded-md border border-border bg-background text-[11px]">
+            {/* Controles de Alinhamento e Largura (Esquerda / Centro / Direita) */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 text-[11px] shadow-sm">
               <button
                 onClick={() => handleWidthCycle("left")}
-                className="px-2 py-0.5 hover:bg-secondary border-r border-border font-semibold text-muted-foreground hover:text-foreground"
-                title="Alargar caixa pela esquerda"
+                className={cn(
+                  "px-2.5 py-1 rounded font-medium transition hover:bg-secondary",
+                  align === "left" && width !== "100%" ? "bg-gold/15 text-gold font-bold" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Mover caixa para a esquerda"
               >
                 ◀ Esquerda
               </button>
               <button
                 onClick={handleToggleFullWidth}
-                className="px-2 py-0.5 hover:bg-secondary border-r border-border font-semibold text-gold"
-                title="Alternar largura total (100%)"
+                className={cn(
+                  "px-2 py-1 rounded font-semibold transition hover:bg-secondary",
+                  width === "100%" ? "text-gold font-bold" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Alternar largura total (100% ou centralizada)"
               >
-                {width === "100%" ? "↔ 70%" : "↔ 100%"}
+                {width === "100%" ? "↔ 100%" : "↔ 70%"}
               </button>
               <button
                 onClick={() => handleWidthCycle("right")}
-                className="px-2 py-0.5 hover:bg-secondary font-semibold text-muted-foreground hover:text-foreground"
-                title="Alargar caixa pela direita"
+                className={cn(
+                  "px-2.5 py-1 rounded font-medium transition hover:bg-secondary",
+                  align === "right" && width !== "100%" ? "bg-gold/15 text-gold font-bold" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Mover caixa para a direita"
               >
                 Direita ▶
               </button>
             </div>
 
-            {/* Controles de Mover e Reposicionar (Subir / Descer) */}
-            <div className="flex items-center rounded-md border border-border bg-background text-[11px]">
+            {/* Controles de Subir / Descer */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 text-[11px] shadow-sm">
               <button
                 onClick={onMoveUp}
                 disabled={!canMoveUp}
-                className="px-2 py-0.5 hover:bg-secondary border-r border-border disabled:opacity-30 font-bold"
+                className="px-2 py-1 rounded hover:bg-secondary disabled:opacity-30 font-bold transition text-muted-foreground hover:text-foreground"
                 title="Mover caixa para cima"
               >
                 ▲
@@ -147,7 +176,7 @@ export function MovableCard({
               <button
                 onClick={onMoveDown}
                 disabled={!canMoveDown}
-                className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 font-bold"
+                className="px-2 py-1 rounded hover:bg-secondary disabled:opacity-30 font-bold transition text-muted-foreground hover:text-foreground"
                 title="Mover caixa para baixo"
               >
                 ▼
@@ -157,7 +186,7 @@ export function MovableCard({
             {/* Minimizar / Expandir */}
             <button
               onClick={() => setIsMinimized((m) => !m)}
-              className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition shadow-sm font-bold"
               title={isMinimized ? "Expandir caixa" : "Recolher caixa"}
             >
               {isMinimized ? "＋" : "−"}

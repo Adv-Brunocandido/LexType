@@ -164,6 +164,25 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
         <span className="italic">Clique em "⌨️ Digitar Artigo" para praticar no motor de digitação</span>
       </div>
 
+      {filteredItems.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-3 bg-secondary/20">
+          <p className="text-sm font-semibold text-foreground">
+            Nenhum dispositivo encontrado para "{searchTerm}" com os filtros atuais.
+          </p>
+          {(selectedDiploma !== "Todos os Diplomas" || selectedEixo !== "Todos os Eixos") && (
+            <button
+              onClick={() => {
+                setSelectedDiploma("Todos os Diplomas");
+                setSelectedEixo("Todos os Eixos");
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-semibold text-gold hover:bg-gold/20 transition shadow-sm"
+            >
+              🔍 Buscar "{searchTerm}" em Todos os Diplomas e Eixos
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Grid de Dispositivos de Lei Seca */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {visibleItems.map((item) => (

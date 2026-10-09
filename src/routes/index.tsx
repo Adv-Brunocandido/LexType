@@ -27,6 +27,7 @@ import {
   LEI_SECA_BANK,
   leiSecaToStudyItem,
   getNextLeiSecaItem,
+  getPreviousLeiSecaItem,
   getLeiSecaItemById,
   getAllLeiSecaItems,
   getRandomLeiSecaItem,
@@ -337,19 +338,78 @@ function Index() {
   const fetchStudy = useServerFn(generateStudy);
   const effectiveArea = area === CUSTOM ? customArea.trim() || "Direito em geral" : area;
 
+  const [typingParts, setTypingParts] = useState<string[]>([]);
+  const [partIndex, setPartIndex] = useState(0);
+
   const say = useCallback((mood: Mood, vars?: { k?: string; n?: number }) => {
     setQuote((q) => ({ text: professorSays(mood, vars), mood, id: q.id + 1 }));
   }, []);
 
-  const loadText = useCallback((text: string) => {
-    const cleanText = text
+  const splitTextIntoTypingParts = useCallback((raw: string, maxLen = 220): string[] => {
+    const clean = raw
       .replace(/[\u00A0\u200B]/g, " ")
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'")
       .replace(/[–—]/g, "-")
       .replace(/\s+/g, " ")
       .trim();
-    eng.current = newEngine(cleanText);
+    if (!clean || clean.length <= maxLen) return clean ? [clean] : [""];
+
+    const sentences = clean.split(/(?<=[;:.!?])\s+/).filter((s) => s.trim().length > 3);
+    const parts: string[] = [];
+    let current = "";
+    for (const s of sentences) {
+      if (s.length > maxLen) {
+        const clauses = s.split(/(?<=[,])\s+/).filter((c) => c.trim().length > 2);
+        for (const c of clauses) {
+          if (!current) {
+            current = c.trim();
+          } else if ((current + " " + c).length <= maxLen) {
+            current += " " + c.trim();
+          } else {
+            parts.push(current);
+            current = c.trim();
+          }
+        }
+      } else {
+        if (!current) {
+          current = s.trim();
+        } else if ((current + " " + s).length <= maxLen) {
+          current += " " + s.trim();
+        } else {
+          parts.push(current);
+          current = s.trim();
+        }
+      }
+    }
+    if (current) parts.push(current);
+
+    if (parts.length <= 1) {
+      const words = clean.split(" ");
+      const wordParts: string[] = [];
+      let curW = "";
+      for (const w of words) {
+        if ((curW + " " + w).length <= maxLen) {
+          curW += (curW ? " " : "") + w;
+        } else {
+          if (curW) wordParts.push(curW);
+          curW = w;
+        }
+      }
+      if (curW) wordParts.push(curW);
+      return wordParts.length > 0 ? wordParts : [clean];
+    }
+
+    return parts;
+  }, []);
+
+  const loadText = useCallback((text: string, targetPartIdx = 0) => {
+    const parts = splitTextIntoTypingParts(text);
+    const pIdx = Math.min(Math.max(0, targetPartIdx), Math.max(0, parts.length - 1));
+    setTypingParts(parts);
+    setPartIndex(pIdx);
+    const activeText = parts[pIdx] || text;
+    eng.current = newEngine(activeText);
     consumed.current = 0;
     if (inputRef.current) inputRef.current.value = "";
     setElapsed(0);
@@ -357,7 +417,7 @@ function Index() {
     setResult(null);
     setFlash(null);
     rerender();
-  }, []);
+  }, [splitTextIntoTypingParts]);
 
   const enrichText = useCallback((text: string, p: Prefs) => {
     const modifiers: TextModifiers = {
@@ -469,6 +529,27 @@ function Index() {
       loadText(item.texto);
     },
     [leiSecaEixo, leiSecaDiploma, leiSecaStartingId, loadText],
+  );
+
+  const prevLeiSeca = useCallback(
+    (eixoOverride?: string, diplomaOverride?: string) => {
+      const targetEixo = eixoOverride ?? leiSecaEixo;
+      const targetDiploma = diplomaOverride ?? leiSecaDiploma;
+      const item = getPreviousLeiSecaItem(
+        currentLeiSeca?.id,
+        targetEixo,
+        seenLeiSecaIds.current,
+        targetDiploma,
+      );
+      if (seenLeiSecaIds.current.length > 1) {
+        seenLeiSecaIds.current.pop();
+      }
+      setCurrentLeiSeca(item);
+      const studyItem = leiSecaToStudyItem(item);
+      setCurrentStudy(studyItem);
+      loadText(item.texto);
+    },
+    [currentLeiSeca?.id, leiSecaEixo, leiSecaDiploma, loadText],
   );
 
   const reset = useCallback(
@@ -640,7 +721,20 @@ function Index() {
           say("combo", { n: e.combo });
         }
         setFlash(null);
-        if (outcome.finished) finish();
+        if (outcome.finished) {
+          if (typingParts.length > 1 && partIndex < typingParts.length - 1) {
+            const nextIdx = partIndex + 1;
+            setPartIndex(nextIdx);
+            const nextText = typingParts[nextIdx] || "";
+            eng.current = newEngine(nextText);
+            consumed.current = 0;
+            if (inputRef.current) inputRef.current.value = "";
+            playWin();
+            say("finishGreat");
+          } else {
+            finish();
+          }
+        }
       } else if (outcome.kind === "wrong") {
         playError();
         const pressedKeys = charToKeys(ch, keyboardLayout);
@@ -655,7 +749,7 @@ function Index() {
       }
       rerender();
     },
-    [finish, keyboardLayout, result, say],
+    [finish, keyboardLayout, partIndex, result, say, typingParts],
   );
 
   const handleBackspace = () => {
@@ -830,14 +924,29 @@ function Index() {
     localStorage.setItem("lextype-muted", m ? "1" : "0");
   };
 
-  const goNext = () =>
-    repeat && eng.current.text
-      ? loadText(eng.current.text)
-      : mode === "estudos"
-        ? void nextStudy(studyQueue, selectedKeys, effectiveArea)
-        : mode === "leiseca"
-          ? nextLeiSeca()
-          : reset(mode, selectedKeys, keyStats, level);
+  const goNext = () => {
+    if (typingParts.length > 1 && partIndex < typingParts.length - 1) {
+      const nextIdx = partIndex + 1;
+      setPartIndex(nextIdx);
+      const nextText = typingParts[nextIdx] || "";
+      eng.current = newEngine(nextText);
+      consumed.current = 0;
+      if (inputRef.current) inputRef.current.value = "";
+      setResult(null);
+      setRunning(false);
+      rerender();
+      return;
+    }
+    if (repeat && eng.current.text) {
+      loadText(eng.current.text);
+    } else if (mode === "estudos") {
+      void nextStudy(studyQueue, selectedKeys, effectiveArea);
+    } else if (mode === "leiseca") {
+      nextLeiSeca();
+    } else {
+      reset(mode, selectedKeys, keyStats, level);
+    }
+  };
   goNextRef.current = goNext;
 
   const e = eng.current;
@@ -1299,7 +1408,7 @@ function Index() {
         {/* Modos */}
         <div
           className={cn(
-            "flex flex-wrap gap-2 transition-opacity duration-500",
+            "flex flex-wrap gap-2.5 sm:gap-3 transition-opacity duration-500",
             inFlow && "opacity-25 hover:opacity-100",
           )}
         >
@@ -1561,12 +1670,20 @@ function Index() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <button
+                  onClick={() => prevLeiSeca(leiSecaEixo, leiSecaDiploma)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary shadow-sm transition-transform active:scale-95"
+                  title="Retornar ao dispositivo anterior"
+                >
+                  <span>◀ Artigo Anterior</span>
+                </button>
                 <button
                   onClick={() => nextLeiSeca(leiSecaEixo, leiSecaStartingId === "random", leiSecaDiploma)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm transition-transform active:scale-95"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm transition-transform active:scale-95"
+                  title="Avançar para o próximo dispositivo"
                 >
-                  <span>{leiSecaStartingId === "random" ? "🎲 Sortear Artigo →" : "Próximo Artigo →"}</span>
+                  <span>{leiSecaStartingId === "random" ? "🎲 Sortear Artigo →" : "Próximo Artigo ▶"}</span>
                 </button>
               </div>
             </div>
@@ -1707,7 +1824,52 @@ function Index() {
                             O professor está preparando a aula de {effectiveArea}…
                           </p>
                         ) : (
-                          <p
+                          <>
+                            {typingParts.length > 1 && (
+                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gold/30 bg-gold/5 px-3.5 py-1.5 text-xs">
+                                <div className="flex items-center gap-2 font-medium">
+                                  <span className="text-gold font-bold">📑 Dispositivo em Partes:</span>
+                                  <span className="rounded bg-gold/20 px-2 py-0.5 font-mono-type font-bold text-foreground">
+                                    Parte {partIndex + 1} de {typingParts.length}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      if (partIndex > 0) {
+                                        const prevIdx = partIndex - 1;
+                                        setPartIndex(prevIdx);
+                                        eng.current = newEngine(typingParts[prevIdx]!);
+                                        consumed.current = 0;
+                                        if (inputRef.current) inputRef.current.value = "";
+                                        rerender();
+                                      }
+                                    }}
+                                    disabled={partIndex === 0}
+                                    className="rounded border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-30 transition-colors"
+                                  >
+                                    ◀ Parte Anterior
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (partIndex < typingParts.length - 1) {
+                                        const nextIdx = partIndex + 1;
+                                        setPartIndex(nextIdx);
+                                        eng.current = newEngine(typingParts[nextIdx]!);
+                                        consumed.current = 0;
+                                        if (inputRef.current) inputRef.current.value = "";
+                                        rerender();
+                                      }
+                                    }}
+                                    disabled={partIndex >= typingParts.length - 1}
+                                    className="rounded border border-gold/40 bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold hover:bg-gold/25 disabled:opacity-30 transition-colors"
+                                  >
+                                    Próxima Parte ▶
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            <p
                             className={cn(
                               "font-mono-type leading-relaxed tracking-wide transition-all",
                               TYPING_FONT_CLASSES[fontTyping],
@@ -1736,6 +1898,7 @@ function Index() {
                               );
                             })}
                           </p>
+                        </>
                         )}
 
                         {/* Semântica e Impacto Prático do Termo Mais Complexo */}
