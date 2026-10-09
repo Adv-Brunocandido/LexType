@@ -98,14 +98,19 @@ As provas obtidas por meios ilícitos são inadmissíveis no processo judicial.`
     expect(SOUND_PROFILES.some((p) => p.name.includes("Red") || p.name.includes("Linear"))).toBe(true);
   });
 
-  it("deve converter LeiSecaItem em StudyItem com Virada de Chave tripartite e atualidades", () => {
-    const item = LEI_SECA_BANK[0]!;
-    const study = leiSecaToStudyItem(item);
-    expect(study.linha).toBe(item.texto);
-    expect(study.virada.titulo).toContain(item.dispositivo);
-    expect(study.virada.conceito).toBe(item.explicacao);
-    expect(study.virada.raciocinio.length).toBeGreaterThan(10);
-    expect(study.virada.exemplo.length).toBeGreaterThan(10);
+  it("deve converter LeiSecaItem em StudyItem com Virada de Chave tripartite e omitir exemplo genérico quando ausente", () => {
+    const itemWithExample = LEI_SECA_BANK.find((i) => i.casoConcreto && i.casoConcreto.length > 0)!;
+    const studyWithExample = leiSecaToStudyItem(itemWithExample);
+    expect(studyWithExample.linha).toBe(itemWithExample.texto);
+    expect(studyWithExample.virada.titulo).toContain(itemWithExample.dispositivo);
+    expect(studyWithExample.virada.conceito).toBe(itemWithExample.explicacao);
+    expect(studyWithExample.virada.raciocinio.length).toBeGreaterThan(10);
+    expect(studyWithExample.virada.exemplo).toBe(itemWithExample.casoConcreto!.trim());
+
+    // Se o artigo não possui caso concreto específico, o exemplo deve ser vazio (sem template genérico artificial)
+    const itemWithoutExample = LEI_SECA_BANK.find((i) => !i.casoConcreto)!;
+    const studyWithoutExample = leiSecaToStudyItem(itemWithoutExample);
+    expect(studyWithoutExample.virada.exemplo).toBe("");
   });
 
   it("deve conter Súmulas do STJ com dispositivo, conceito, virada de chave e exemplo prático", () => {

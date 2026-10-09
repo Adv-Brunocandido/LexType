@@ -30,6 +30,7 @@ import {
   getLeiSecaItemById,
   getAllLeiSecaItems,
   getRandomLeiSecaItem,
+  getDiplomasList,
 } from "@/lib/lei-seca";
 import {
   adaptiveRoute,
@@ -200,6 +201,7 @@ function Index() {
     "treino" | "leiseca" | "dicionario" | "desempenho" | "ranking"
   >("treino");
   const [leiSecaEixo, setLeiSecaEixo] = useState<string>("Todos os Eixos");
+  const [leiSecaDiploma, setLeiSecaDiploma] = useState<string>("Todos os Diplomas");
   const [leiSecaStartingId, setLeiSecaStartingId] = useState<string>("random");
   const [currentLeiSeca, setCurrentLeiSeca] = useState<LeiSecaItem | null>(null);
   const seenLeiSecaIds = useRef<string[]>([]);
@@ -443,17 +445,20 @@ function Index() {
     [fetchStudy, loadText, lineCount, reference, aiKey, aiProvider],
   );
 
+  const availableDiplomas = useMemo(() => getDiplomasList(), []);
+
   const availableLeiSecaItems = useMemo(() => {
-    return getAllLeiSecaItems(leiSecaEixo);
-  }, [leiSecaEixo]);
+    return getAllLeiSecaItems(leiSecaEixo, leiSecaDiploma);
+  }, [leiSecaEixo, leiSecaDiploma]);
 
   const nextLeiSeca = useCallback(
-    (eixoOverride?: string, forceRandom = false) => {
+    (eixoOverride?: string, forceRandom = false, diplomaOverride?: string) => {
       const targetEixo = eixoOverride ?? leiSecaEixo;
+      const targetDiploma = diplomaOverride ?? leiSecaDiploma;
       const isRandom = forceRandom || leiSecaStartingId === "random";
       const item = isRandom
-        ? getRandomLeiSecaItem(targetEixo, seenLeiSecaIds.current)
-        : getNextLeiSecaItem(targetEixo, seenLeiSecaIds.current);
+        ? getRandomLeiSecaItem(targetEixo, seenLeiSecaIds.current, targetDiploma)
+        : getNextLeiSecaItem(targetEixo, seenLeiSecaIds.current, targetDiploma);
       seenLeiSecaIds.current.push(item.id);
       if (seenLeiSecaIds.current.length >= LEI_SECA_BANK.length) {
         seenLeiSecaIds.current = [item.id];
@@ -463,7 +468,7 @@ function Index() {
       setCurrentStudy(studyItem);
       loadText(item.texto);
     },
-    [leiSecaEixo, leiSecaStartingId, loadText],
+    [leiSecaEixo, leiSecaDiploma, leiSecaStartingId, loadText],
   );
 
   const reset = useCallback(
@@ -1468,32 +1473,58 @@ function Index() {
 
         {/* Info do modo Lei Seca */}
         {mode === "leiseca" && (
-          <div className="space-y-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
+          <div className="space-y-3.5 rounded-xl border border-gold/40 bg-gold/5 p-4 text-sm shadow-sm backdrop-blur-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <label htmlFor="eixo-leiseca" className="font-medium text-foreground">
-                  Eixo da Lei Seca:
-                </label>
-                <select
-                  id="eixo-leiseca"
-                  value={leiSecaEixo}
-                  onChange={(ev) => {
-                    const nx = ev.target.value;
-                    setLeiSecaEixo(nx);
-                    nextLeiSeca(nx);
-                  }}
-                  className="rounded-md border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm"
-                >
-                  {LEI_SECA_EIXOS.map((e) => (
-                    <option key={e} value={e}>
-                      {e}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5">
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="diploma-leiseca" className="text-xs font-semibold text-foreground">
+                    📜 Diploma:
+                  </label>
+                  <select
+                    id="diploma-leiseca"
+                    value={leiSecaDiploma}
+                    onChange={(ev) => {
+                      const nx = ev.target.value;
+                      setLeiSecaDiploma(nx);
+                      setLeiSecaStartingId("random");
+                      nextLeiSeca(leiSecaEixo, true, nx);
+                    }}
+                    className="max-w-[190px] sm:max-w-[240px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
+                  >
+                    {availableDiplomas.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="eixo-leiseca" className="text-xs font-semibold text-foreground">
+                    ⚖️ Eixo:
+                  </label>
+                  <select
+                    id="eixo-leiseca"
+                    value={leiSecaEixo}
+                    onChange={(ev) => {
+                      const nx = ev.target.value;
+                      setLeiSecaEixo(nx);
+                      setLeiSecaStartingId("random");
+                      nextLeiSeca(nx, true, leiSecaDiploma);
+                    }}
+                    className="max-w-[170px] sm:max-w-[210px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
+                  >
+                    {LEI_SECA_EIXOS.map((e) => (
+                      <option key={e} value={e}>
+                        {e}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <div className="flex items-center gap-1.5">
                   <label htmlFor="artigo-inicial" className="text-xs font-medium text-muted-foreground">
-                    Artigo Inicial:
+                    Dispositivo:
                   </label>
                   <select
                     id="artigo-inicial"
@@ -1502,7 +1533,7 @@ function Index() {
                       const val = ev.target.value;
                       setLeiSecaStartingId(val);
                       if (val === "random") {
-                        nextLeiSeca(leiSecaEixo, true);
+                        nextLeiSeca(leiSecaEixo, true, leiSecaDiploma);
                       } else {
                         const target = getLeiSecaItemById(val);
                         if (target) {
@@ -1513,9 +1544,9 @@ function Index() {
                         }
                       }
                     }}
-                    className="max-w-[210px] sm:max-w-[270px] truncate rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm"
+                    className="max-w-[190px] sm:max-w-[250px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
                   >
-                    <option value="random">🎲 Aleatório (Padrão)</option>
+                    <option value="random">🎲 Aleatório ({availableLeiSecaItems.length} disp.)</option>
                     {availableLeiSecaItems.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.dispositivo} - {item.diploma}
@@ -1527,26 +1558,29 @@ function Index() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => nextLeiSeca(leiSecaEixo, leiSecaStartingId === "random")}
-                  className="rounded-md bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm"
+                  onClick={() => nextLeiSeca(leiSecaEixo, leiSecaStartingId === "random", leiSecaDiploma)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm transition-transform active:scale-95"
                 >
-                  {leiSecaStartingId === "random" ? "🎲 Sortear Artigo →" : "Próximo Artigo →"}
+                  <span>{leiSecaStartingId === "random" ? "🎲 Sortear Artigo →" : "Próximo Artigo →"}</span>
                 </button>
               </div>
             </div>
 
             {currentLeiSeca && (
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gold/20 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-gold/20 text-xs">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-gold">
                     📜 {currentLeiSeca.diploma}:
                   </span>
-                  <span className="rounded bg-gold/15 px-2 py-0.5 font-bold text-foreground">
+                  <span className="rounded bg-gold/15 px-2.5 py-0.5 font-bold text-foreground">
                     {currentLeiSeca.dispositivo}
                   </span>
+                  <span className="rounded bg-secondary/80 px-2 py-0.5 text-[11px] text-muted-foreground">
+                    {currentLeiSeca.eixo}
+                  </span>
                 </div>
-                <span className="text-muted-foreground hidden sm:inline font-mono-type">
-                  {currentLeiSeca.fonteOficial}
+                <span className="text-muted-foreground hidden sm:inline font-mono-type text-[11px]">
+                  🏛️ {currentLeiSeca.fonteOficial}
                 </span>
               </div>
             )}
@@ -2079,14 +2113,16 @@ function LessonCard({
           {item.virada.raciocinio}
         </p>
       </div>
-      <div className="rounded-lg bg-card/60 p-3.5 border border-border/60">
-        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-          ⚖️ Exemplo no Caso Concreto
+      {Boolean(item.virada.exemplo && item.virada.exemplo.trim()) && (
+        <div className="rounded-lg bg-card/60 p-3.5 border border-border/60">
+          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+            ⚖️ Exemplo no Caso Concreto
+          </div>
+          <p className={cn("text-muted-foreground", STUDY_FONT_CLASSES[fontStudy])}>
+            {item.virada.exemplo}
+          </p>
         </div>
-        <p className={cn("text-muted-foreground", STUDY_FONT_CLASSES[fontStudy])}>
-          {item.virada.exemplo}
-        </p>
-      </div>
+      )}
     </div>
   );
 }

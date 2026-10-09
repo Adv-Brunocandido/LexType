@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
 import {
   LEI_SECA_BANK,
   LEI_SECA_EIXOS,
   checkAndSyncOfficialLegislation,
   filterLeiSeca,
+  getDiplomasList,
   type LeiSecaEixo,
   type LeiSecaItem,
 } from "@/lib/lei-seca";
@@ -17,6 +17,7 @@ interface LeiSecaPanelProps {
 
 export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaPanelProps) {
   const [selectedEixo, setSelectedEixo] = useState<LeiSecaEixo>("Todos os Eixos");
+  const [selectedDiploma, setSelectedDiploma] = useState<string>("Todos os Diplomas");
   const [searchTerm, setSearchTerm] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(() => {
@@ -25,9 +26,11 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
     return last ? `Última sincronização com portais oficiais: ${last}` : null;
   });
 
+  const availableDiplomas = useMemo(() => getDiplomasList(), []);
+
   const filteredItems = useMemo(() => {
-    return filterLeiSeca(selectedEixo, searchTerm);
-  }, [selectedEixo, searchTerm]);
+    return filterLeiSeca(selectedEixo, searchTerm, selectedDiploma);
+  }, [selectedEixo, searchTerm, selectedDiploma]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -90,19 +93,36 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
 
       {/* Barra de Filtros e Busca */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Eixo Temático:</span>
-          <select
-            value={selectedEixo}
-            onChange={(e) => setSelectedEixo(e.target.value as LeiSecaEixo)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground"
-          >
-            {LEI_SECA_EIXOS.map((eixo) => (
-              <option key={eixo} value={eixo}>
-                {eixo}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-foreground">📜 Diploma:</span>
+            <select
+              value={selectedDiploma}
+              onChange={(e) => setSelectedDiploma(e.target.value)}
+              className="max-w-[200px] truncate rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-gold focus:outline-none"
+            >
+              {availableDiplomas.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-foreground">⚖️ Eixo:</span>
+            <select
+              value={selectedEixo}
+              onChange={(e) => setSelectedEixo(e.target.value as LeiSecaEixo)}
+              className="max-w-[180px] truncate rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-gold focus:outline-none"
+            >
+              {LEI_SECA_EIXOS.map((eixo) => (
+                <option key={eixo} value={eixo}>
+                  {eixo}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="relative min-w-56 sm:w-72">
@@ -177,6 +197,14 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
                 <strong className="text-foreground">⚖️ Incidência & Prática: </strong>
                 {item.explicacao}
               </div>
+
+              {/* Caso Concreto Autêntico (apenas quando fornecido) */}
+              {item.casoConcreto && item.casoConcreto.trim() && (
+                <div className="mt-2.5 rounded-lg bg-gold/10 p-2.5 border border-gold/30 text-xs">
+                  <strong className="text-gold">⚖️ Exemplo no Caso Concreto: </strong>
+                  <span className="text-foreground">{item.casoConcreto}</span>
+                </div>
+              )}
 
               {/* Semântica dos Termos Complexos */}
               {item.palavrasComplexas && item.palavrasComplexas.length > 0 && (

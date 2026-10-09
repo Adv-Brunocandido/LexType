@@ -1,4 +1,10 @@
 import type { StudyItem } from "@/lib/study.functions";
+import {
+  VADE_MECUM_ITEMS,
+  DIPLOMAS_META,
+  type VadeMecumItem,
+  type DiplomaMeta,
+} from "@/lib/vade-mecum/vade-mecum-data";
 
 // Banco de Legislação Oficial "Lei Seca" & Sincronizador Governamental (Planalto / STF / STJ)
 // Contém artigos, incisos, parágrafos e súmulas vinculantes organizados por eixos temáticos da OAB.
@@ -11,7 +17,7 @@ export interface LeiSecaItem {
   dispositivo: string;
   texto: string;
   explicacao: string;
-  palavrasComplexas: { termo: string; semantica: string }[];
+  palavrasComplexas?: { termo: string; semantica: string }[];
   fonteOficial: string;
   artigoNum?: number;
   atualidade?: string;
@@ -35,7 +41,7 @@ export const LEI_SECA_EIXOS = [
 
 export type LeiSecaEixo = (typeof LEI_SECA_EIXOS)[number];
 
-export const LEI_SECA_BANK: LeiSecaItem[] = [
+const BASE_LEI_SECA_ITEMS: LeiSecaItem[] = [
   // --- CONSTITUIÇÃO FEDERAL DE 1988 ---
   {
     id: "cf-art5-caput",
@@ -691,6 +697,17 @@ export const LEI_SECA_BANK: LeiSecaItem[] = [
   },
 ];
 
+// Acervo unificado: Itens base + Acervo integral do Vade Mecum Digital (sem duplicatas de id)
+export const LEI_SECA_BANK: LeiSecaItem[] = [
+  ...BASE_LEI_SECA_ITEMS,
+  ...(VADE_MECUM_ITEMS as LeiSecaItem[]).filter(
+    (vm) => !BASE_LEI_SECA_ITEMS.some((base) => base.id === vm.id)
+  ),
+];
+
+// Metadados dos diplomas
+export { DIPLOMAS_META, type DiplomaMeta };
+
 // Carregador e sincronizador offline / local
 export function getStoredLeiSeca(): LeiSecaItem[] {
   if (typeof localStorage === "undefined") return LEI_SECA_BANK;
@@ -706,17 +723,26 @@ export function getStoredLeiSeca(): LeiSecaItem[] {
   return LEI_SECA_BANK;
 }
 
-export function filterLeiSeca(eixo?: string, query?: string): LeiSecaItem[] {
+export function getDiplomasList(): string[] {
+  const set = new Set<string>();
+  for (const item of LEI_SECA_BANK) {
+    if (item.diploma) set.add(item.diploma);
+  }
+  return ["Todos os Diplomas", ...Array.from(set)];
+}
+
+export function filterLeiSeca(eixo?: string, query?: string, diploma?: string): LeiSecaItem[] {
   const bank = getStoredLeiSeca();
   return bank.filter((item) => {
     const matchesEixo = !eixo || eixo === "Todos os Eixos" || item.eixo === eixo;
+    const matchesDiploma = !diploma || diploma === "Todos os Diplomas" || item.diploma === diploma;
     const matchesQuery =
       !query ||
       item.diploma.toLowerCase().includes(query.toLowerCase()) ||
       item.dispositivo.toLowerCase().includes(query.toLowerCase()) ||
       item.texto.toLowerCase().includes(query.toLowerCase()) ||
       item.explicacao.toLowerCase().includes(query.toLowerCase());
-    return matchesEixo && matchesQuery;
+    return matchesEixo && matchesDiploma && matchesQuery;
   });
 }
 
@@ -753,7 +779,7 @@ export async function checkAndSyncOfficialLegislation(): Promise<{
       lastChecked: now,
       source: "Portal da Legislação da Presidência da República (Planalto) & STF Jurisprudência",
       status: "success",
-      message: `Legislação oficial integralmente conferida e em conformidade com as últimas emendas constitucionais e súmulas vinculantes (${now}).`,
+      message: `Legislação oficial integralmente conferida e em conformidade com as últimas emendas constitucionais e súmulas vinculantes (${now}). Total de ${LEI_SECA_BANK.length} artigos carregados.`,
     };
   } catch {
     return {
@@ -761,7 +787,7 @@ export async function checkAndSyncOfficialLegislation(): Promise<{
       lastChecked: now,
       source: "Banco Offline Integrado de Legislação Oficial",
       status: "offline",
-      message: "Verificação realizada localmente: todos os diplomas vigentes estão carregados e disponíveis offline.",
+      message: `Verificação realizada localmente: todos os ${LEI_SECA_BANK.length} diplomas vigentes estão carregados e disponíveis offline.`,
     };
   }
 }
@@ -769,10 +795,8 @@ export async function checkAndSyncOfficialLegislation(): Promise<{
 export function leiSecaToStudyItem(item: LeiSecaItem): StudyItem {
   const atualidade =
     item.atualidade ||
-    `Tese Vinculante / Atualidade: ${item.explicacao} (Precedente consolidado perante a jurisprudência da FGV/Tribunais Superiores).`;
-  const caso =
-    item.casoConcreto ||
-    `Em situação concreta, o descumprimento do ${item.dispositivo} do ${item.diploma} enseja nulidade processual ou reparação civil/administrativa em favor do titular lesado.`;
+    `Tese Vinculante / Exegese: ${item.explicacao}`;
+  const caso = item.casoConcreto ? item.casoConcreto.trim() : "";
 
   return {
     linha: item.texto,
@@ -787,8 +811,8 @@ export function leiSecaToStudyItem(item: LeiSecaItem): StudyItem {
   };
 }
 
-export function getNextLeiSecaItem(eixo?: string, seen: string[] = []): LeiSecaItem {
-  const filtered = filterLeiSeca(eixo);
+export function getNextLeiSecaItem(eixo?: string, seen: string[] = [], diploma?: string): LeiSecaItem {
+  const filtered = filterLeiSeca(eixo, undefined, diploma);
   const pool = filtered.length > 0 ? filtered : getStoredLeiSeca();
   const unseen = pool.filter((item) => !seen.includes(item.id));
   const candidate = unseen.length > 0 ? unseen[0]! : pool[0]!;
@@ -800,16 +824,17 @@ export function getLeiSecaItemById(id: string): LeiSecaItem | undefined {
   return bank.find((item) => item.id === id);
 }
 
-export function getAllLeiSecaItems(eixo?: string): LeiSecaItem[] {
-  return filterLeiSeca(eixo);
+export function getAllLeiSecaItems(eixo?: string, diploma?: string): LeiSecaItem[] {
+  return filterLeiSeca(eixo, undefined, diploma);
 }
 
-export function getRandomLeiSecaItem(eixo?: string, seen: string[] = []): LeiSecaItem {
-  const filtered = filterLeiSeca(eixo);
+export function getRandomLeiSecaItem(eixo?: string, seen: string[] = [], diploma?: string): LeiSecaItem {
+  const filtered = filterLeiSeca(eixo, undefined, diploma);
   const pool = filtered.length > 0 ? filtered : getStoredLeiSeca();
   const unseen = pool.filter((item) => !seen.includes(item.id));
   const targetPool = unseen.length > 0 ? unseen : pool;
   const randomIndex = Math.floor(Math.random() * targetPool.length);
   return targetPool[randomIndex]!;
 }
+
 
