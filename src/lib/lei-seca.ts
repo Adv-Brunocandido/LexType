@@ -30,6 +30,7 @@ export const LEI_SECA_EIXOS = [
   "Direito Tributário",
   "Direito Administrativo",
   "Súmulas Vinculantes do STF",
+  "Súmulas do Superior Tribunal de Justiça (STJ)",
 ] as const;
 
 export type LeiSecaEixo = (typeof LEI_SECA_EIXOS)[number];
@@ -474,6 +475,220 @@ export const LEI_SECA_BANK: LeiSecaItem[] = [
     ],
     fonteOficial: "Planalto (CTN)",
   },
+
+  // --- SÚMULAS VINCULANTES DO SUPREMO TRIBUNAL FEDERAL (STF) ---
+  {
+    id: "stf-sv-11",
+    eixo: "Súmulas Vinculantes do STF",
+    disciplina: "Direito Processual Penal",
+    diploma: "Súmula Vinculante 11 (STF)",
+    dispositivo: "Súmula Vinculante 11",
+    texto: "Só é lícito o uso de algemas em casos de resistência e de fundado receio de fuga ou de perigo à integridade física própria ou alheia, por parte do preso ou de terceiros, justificada a excepcionalidade por escrito, sob pena de responsabilidade disciplinar, civil e penal do agente ou da autoridade e de nulidade da prisão ou do ato processual a que se refere, sem prejuízo da responsabilidade civil do Estado.",
+    explicacao: "Excepcionalidade do uso de algemas (mnemônico PRF: Perigo, Resistência ou Fuga). A justificativa deve ser contemporânea e expressa por escrito, sob pena de nulidade do ato e responsabilização da autoridade.",
+    palavrasComplexas: [
+      {
+        termo: "justificada a excepcionalidade",
+        semantica: "Dever indeclinável da autoridade de registrar em ata ou termo as razões concretas que motivaram a restrição física.",
+      },
+    ],
+    fonteOficial: "STF Jurisprudência (DJe 08/09/2008)",
+  },
+  {
+    id: "stf-sv-14",
+    eixo: "Súmulas Vinculantes do STF",
+    disciplina: "Ética e Prerrogativas (OAB)",
+    diploma: "Súmula Vinculante 14 (STF)",
+    dispositivo: "Súmula Vinculante 14",
+    texto: "É direito do defensor, no interesse do representado, ter acesso amplo aos elementos de prova que, já documentados em procedimento investigatório realizado por órgão com competência de polícia judiciária, digam respeito ao exercício do direito de defesa.",
+    explicacao: "Prerrogativa da advocacia de acesso aos autos de investigação. Aplica-se às provas já documentadas e encartadas aos autos; não alcança diligências em curso e sigilosas cuja eficácia dependa do segredo (ex.: interceptação telefônica ativa).",
+    palavrasComplexas: [
+      {
+        termo: "já documentados",
+        semantica: "Atos investigatórios finalizados e formalizados; exclui mandados de busca e apreensão ou escutas em andamento.",
+      },
+    ],
+    fonteOficial: "STF Jurisprudência (DJe 09/02/2009)",
+  },
+  {
+    id: "stf-sv-56",
+    eixo: "Súmulas Vinculantes do STF",
+    disciplina: "Direito Penal",
+    diploma: "Súmula Vinculante 56 (STF)",
+    dispositivo: "Súmula Vinculante 56",
+    texto: "A falta de estabelecimento penal adequado não autoriza a manutenção do preso em regime prisional mais gravoso, devendo-se observar, nessa hipótese, os parâmetros fixados no RE 641.320/RS.",
+    explicacao: "Vedação ao excesso de execução penal. Inexistindo vaga em colônia agrícola (semiaberto) ou casa de albergado (aberto), o apenado não pode permanecer recolhido em estabelecimento de regime fechado, cabendo prisão domiciliar monitorada.",
+    palavrasComplexas: [
+      {
+        termo: "regime mais gravoso",
+        semantica: "Violação ao princípio da individualização da pena quando o Estado impõe confinamento mais severo por deficiência estrutural própria.",
+      },
+    ],
+    fonteOficial: "STF Jurisprudência (DJe 08/08/2016)",
+  },
+
+  // --- SÚMULAS DO SUPERIOR TRIBUNAL DE JUSTIÇA (STJ) ---
+  {
+    id: "stj-sum-387",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito Civil",
+    diploma: "Súmula 387 (STJ)",
+    dispositivo: "Súmula 387",
+    texto: "É lícita a cumulação das indenizações de dano estético e dano moral.",
+    explicacao: "Autonomia do dano estético em relação ao dano moral. O dano estético tutela a integridade anatômica e a alteração morfológica externa perceptível, enquanto o dano moral tutela o sofrimento psíquico íntimo; ambos podem decorrer do mesmo fato lesivo.",
+    palavrasComplexas: [
+      {
+        termo: "cumulação lícita",
+        semantica: "Possibilidade jurídica de formular pedidos indenizatórios autônomos sem incorrer em bis in idem indenizatório.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 01/09/2009)",
+    atualidade: "Tese consolidada pelo STJ e exigida com alta reincidência na FGV/OAB em casos de responsabilidade civil médica e acidentes automobilísticos.",
+    casoConcreto: "Vítima de erro médico sofre cicatrizes deformantes na face e grave abalo emocional. O magistrado concede cumulação das verbas de dano moral (R$ 50.000) e dano estético (R$ 40.000).",
+  },
+  {
+    id: "stj-sum-385",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito do Consumidor",
+    diploma: "Súmula 385 (STJ)",
+    dispositivo: "Súmula 385",
+    texto: "Da anotação irregular em cadastro de proteção ao crédito, não cabe indenização por dano moral, quando preexistente legítima inscrição, ressalvado o direito ao cancelamento.",
+    explicacao: "Limitação ao dano moral in re ipsa em negativações indevidas. Se o devedor já tiver outras inscrições legítimas e ativas em órgãos de proteção ao crédito (SPC/Serasa), a nova inscrição indevida gera direito de cancelamento, mas não gera indenização pecuniária por dano moral.",
+    palavrasComplexas: [
+      {
+        termo: "preexistente legítima inscrição",
+        semantica: "Existência de anotação desabonadora anterior válida e incontroversa, demonstrando habitualidade de inadimplência.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 08/06/2009)",
+    atualidade: "O STJ estendeu recentemente o entendimento da Súmula 385 também para protestos indevidos de títulos quando já existirem protestos legítimos anteriores.",
+    casoConcreto: "Consumidor tem o nome negativado por fatura fraudulenta, mas já possuía 3 negativações legítimas vigentes por outros credores. O juiz determina a exclusão do apontamento mas indefere o dano moral com base na Súmula 385.",
+  },
+  {
+    id: "stj-sum-543",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito Civil",
+    diploma: "Súmula 543 (STJ)",
+    dispositivo: "Súmula 543",
+    texto: "Na hipótese de resolução de contrato de promessa de compra e venda de imóvel submetido ao Código de Defesa do Consumidor, deve ocorrer a imediata restituição das parcelas pagas pelo promitente comprador - integralmente, em caso de culpa exclusiva do promitente vendedor/construtor, ou parcialmente, caso tenha sido o comprador quem deu causa ao desfazimento.",
+    explicacao: "Resolução contratual em incorporação imobiliária. A devolução dos valores pagos deve ser imediata e em parcela única (vedado o parcelamento). Havendo culpa da incorporadora (atraso na entrega), restituição de 100%; desistência imotivada do comprador, retenção proporcional.",
+    palavrasComplexas: [
+      {
+        termo: "imediata restituição",
+        semantica: "Dever de pagamento à vista e sem postergação das quantias a restituir, sendo nula cláusula de parcelamento.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 31/08/2015)",
+    atualidade: "Tese repetitiva aplicada pelo STJ mesmo após a edição da Lei do Distrato Imobiliário (Lei 13.786/2018).",
+    casoConcreto: "Construtora atrasa em 2 anos a entrega das chaves de apartamento. O comprador requer a rescisão: o STJ determina devolução de 100% dos valores pagos de forma imediata e com correção monetária.",
+  },
+  {
+    id: "stj-sum-410",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito Processual Civil",
+    diploma: "Súmula 410 (STJ)",
+    dispositivo: "Súmula 410",
+    texto: "A prévia intimação pessoal do devedor constitui condição necessária para a cobrança de multa pelo descumprimento de obrigação de fazer ou não fazer.",
+    explicacao: "Exigibilidade de astreintes (multa cominatória diária). Para executar a multa fixada judicialmente, a intimação do patrono via publicação oficial não basta: é indispensável a intimação pessoal do próprio devedor obrigado ao fazer.",
+    palavrasComplexas: [
+      {
+        termo: "intimação pessoal",
+        semantica: "Comunicação formal dirigida diretamente à pessoa do devedor (por mandado ou carta com AR), e não ao seu procurador.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 16/12/2009)",
+    atualidade: "A Corte Especial do STJ ratificou a vigência da Súmula 410 mesmo sob a vigência do CPC/2015.",
+    casoConcreto: "Juiz concede tutela antecipada para operadora fornecer prótese em 48h sob pena de multa de R$ 5.000/dia, intimando apenas o advogado no diário. A execução da multa é extinta por vício na intimação pessoal do obrigado.",
+  },
+  {
+    id: "stj-sum-381",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito do Consumidor",
+    diploma: "Súmula 381 (STJ)",
+    dispositivo: "Súmula 381",
+    texto: "Nos contratos bancários, é vedado ao julgador conhecer, de ofício, da abusividade das cláusulas.",
+    explicacao: "Inércia da jurisdição em contratos bancários. Embora as normas de proteção ao consumidor sejam de ordem pública, o juiz não pode anular juros remuneratórios ou tarifas bancárias sem pedido expresso da parte autora.",
+    palavrasComplexas: [
+      {
+        termo: "vedado de ofício",
+        semantica: "Proibição de atuação jurisdicional sem prévia provocação expressa da parte (princípio da congruência / adstrição).",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 05/05/2009)",
+    atualidade: "Tese tema 472 do STJ: exige impugnação específica para cada encargo bancário questionado na petição inicial.",
+    casoConcreto: "Em ação revisional versando apenas sobre juros de cheque especial, o juiz anula também a tarifa de abertura de crédito sem pedido. O tribunal reforma a decisão por violação à Súmula 381.",
+  },
+  {
+    id: "stj-sum-599",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito Penal",
+    diploma: "Súmula 599 (STJ)",
+    dispositivo: "Súmula 599",
+    texto: "O princípio da insignificância é inaplicável aos crimes contra a administração pública.",
+    explicacao: "Inaplicabilidade da bagatela na tutela da probidade pública. Em crimes como peculato ou corrupção, o bem jurídico protegido não é apenas o patrimônio financeiro, mas a moralidade administrativa e o dever de lealdade ao Estado.",
+    palavrasComplexas: [
+      {
+        termo: "princípio da insignificância",
+        semantica: "Postulado dogmático de exclusão da tipicidade material quando a lesão ao bem tutelado for inexpressiva.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 27/11/2017)",
+    atualidade: "Exceção pacificada: aplica-se a insignificância exclusivamente ao crime de descaminho quando o tributo elidido for inferior ao teto de execução fiscal (R$ 20.000).",
+    casoConcreto: "Servidor municipal subtrai resma de papel de R$ 25 do almoxarifado. Denunciado por peculato-furto, o STJ afasta a insignificância por violar a moralidade do serviço público.",
+  },
+  {
+    id: "stj-sum-630",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito Penal",
+    diploma: "Súmula 630 (STJ)",
+    dispositivo: "Súmula 630",
+    texto: "A incidência da atenuante da confissão espontânea no crime de tráfico ilícito de entorpecentes exige o reconhecimento da traficância pelo acusado, não bastando a mera admissão da posse ou porte para uso próprio.",
+    explicacao: "Confissão qualificada vs. confissão espontânea no tráfico de drogas. Dizer que a substância era para consumo pessoal visa a desclassificação para o art. 28 da Lei 11.343/06, não configurando a atenuante do art. 65, III, d, do Código Penal para o crime de tráfico.",
+    palavrasComplexas: [
+      {
+        termo: "confissão da traficância",
+        semantica: "Reconhecimento inequívoco da destinação mercantil ou circulação onerosa/gratuita da droga a terceiros.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 02/05/2019)",
+    atualidade: "Tema sumulado repetido frequentemente na prova de 1ª e 2ª Fase Penal da FGV/OAB.",
+    casoConcreto: "Réu flagrado com 80g de maconha e balança admite a posse alegando consumo próprio. O magistrado condena por tráfico e afasta a atenuante da confissão com base na Súmula 630.",
+  },
+  {
+    id: "stj-sum-444",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito Penal",
+    diploma: "Súmula 444 (STJ)",
+    dispositivo: "Súmula 444",
+    texto: "É vedada a utilização de inquéritos policiais e ações penais em curso para agravar a pena-base.",
+    explicacao: "Presunção de inocência na dosimetria da pena (art. 59 do Código Penal). Inquéritos policiais ou processos judiciais em andamento não transitados em julgado não podem ser computados como maus antecedentes nem para negativar conduta social.",
+    palavrasComplexas: [
+      {
+        termo: "agravar a pena-base",
+        semantica: "Elevação da sanção penal na 1ª fase de fixação da pena em decorrência das circunstâncias judiciais do art. 59 do CP.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 13/05/2010)",
+    atualidade: "Súmula reiterada em repercussão geral pelo STF (Tema 129), confirmando a impossibilidade de valorar processos em curso.",
+    casoConcreto: "Ao proferir sentença condenatória, o juiz eleva a pena-base fundamentando que o réu responde a dois inquéritos por estelionato. O tribunal reduz a pena ao mínimo legal com fulcro na Súmula 444.",
+  },
+  {
+    id: "stj-sum-610",
+    eixo: "Súmulas do Superior Tribunal de Justiça (STJ)",
+    disciplina: "Direito Penal",
+    diploma: "Súmula 610 (STJ)",
+    dispositivo: "Súmula 610",
+    texto: "Não é possível a aplicação da causa de diminuição da pena da tentativa ao delito de roubo nas hipóteses em que houve a inversão da posse do bem, ainda que por breve tempo e sem posse mansa e pacífica.",
+    explicacao: "Consumação do roubo pela teoria da amotio (ou apprehensio). O crime de roubo consuma-se no instante em que o infrator obtém a posse da coisa subtraída, mesmo que imediatamente perseguido pelos agentes de segurança ou pela vítima.",
+    palavrasComplexas: [
+      {
+        termo: "inversão da posse",
+        semantica: "Transferência física do controle material sobre o bem para a esfera de custódia do agente delitivo.",
+      },
+    ],
+    fonteOficial: "STJ Jurisprudência (DJe 08/03/2018)",
+    atualidade: "Tese consolidada pelo STJ no Recurso Especial Repetitivo 1.499.050/RJ.",
+    casoConcreto: "Subtraído o celular da vítima sob grave ameaça, o agente corre 30 metros e é alcançado pela guarnição policial. O crime é considerado formal e materialmente consumado, afastando a tentativa.",
+  },
 ];
 
 // Carregador e sincronizador offline / local
@@ -579,3 +794,22 @@ export function getNextLeiSecaItem(eixo?: string, seen: string[] = []): LeiSecaI
   const candidate = unseen.length > 0 ? unseen[0]! : pool[0]!;
   return candidate;
 }
+
+export function getLeiSecaItemById(id: string): LeiSecaItem | undefined {
+  const bank = getStoredLeiSeca();
+  return bank.find((item) => item.id === id);
+}
+
+export function getAllLeiSecaItems(eixo?: string): LeiSecaItem[] {
+  return filterLeiSeca(eixo);
+}
+
+export function getRandomLeiSecaItem(eixo?: string, seen: string[] = []): LeiSecaItem {
+  const filtered = filterLeiSeca(eixo);
+  const pool = filtered.length > 0 ? filtered : getStoredLeiSeca();
+  const unseen = pool.filter((item) => !seen.includes(item.id));
+  const targetPool = unseen.length > 0 ? unseen : pool;
+  const randomIndex = Math.floor(Math.random() * targetPool.length);
+  return targetPool[randomIndex]!;
+}
+

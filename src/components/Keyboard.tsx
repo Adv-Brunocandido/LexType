@@ -149,7 +149,7 @@ export function Keyboard({
                       "z-10 scale-110 shadow-[0_0_18px] shadow-primary/40",
                     isFlash &&
                       flash?.type === "err" &&
-                      "animate-shake border-destructive bg-destructive text-destructive-foreground",
+                      "z-20 scale-110 border-destructive bg-destructive text-white font-bold shadow-[0_0_20px_rgba(239,68,68,0.9)] animate-shake",
                   )}
                 >
                   {d.shift && (

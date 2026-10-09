@@ -18,6 +18,8 @@ import {
 import { generateStudy, type StudyItem } from "@/lib/study.functions";
 import { offlineStudy, extractComplexLegalTerm } from "@/lib/study-offline";
 import { LeiSecaPanel } from "@/components/LeiSecaPanel";
+import { DicionarioPanel } from "@/components/DicionarioPanel";
+import { RankingRecordsPanel } from "@/components/RankingRecordsPanel";
 import { MovableCard } from "@/components/MovableCard";
 import {
   type LeiSecaItem,
@@ -25,6 +27,9 @@ import {
   LEI_SECA_BANK,
   leiSecaToStudyItem,
   getNextLeiSecaItem,
+  getLeiSecaItemById,
+  getAllLeiSecaItems,
+  getRandomLeiSecaItem,
 } from "@/lib/lei-seca";
 import {
   adaptiveRoute,
@@ -191,8 +196,11 @@ function Index() {
   const [repeat, setRepeat] = useState(false);
   const [pinned, setPinned] = useState<StudyItem | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<"treino" | "leiseca" | "desempenho">("treino");
+  const [activeTab, setActiveTab] = useState<
+    "treino" | "leiseca" | "dicionario" | "desempenho" | "ranking"
+  >("treino");
   const [leiSecaEixo, setLeiSecaEixo] = useState<string>("Todos os Eixos");
+  const [leiSecaStartingId, setLeiSecaStartingId] = useState<string>("random");
   const [currentLeiSeca, setCurrentLeiSeca] = useState<LeiSecaItem | null>(null);
   const seenLeiSecaIds = useRef<string[]>([]);
 
@@ -250,7 +258,9 @@ function Index() {
   const [soundProfile, setSoundProfileState] = useState<SoundProfile>(() => soundSettings.profile);
 
   // Configurações locais de IA
-  const [aiProvider, setAiProvider] = useState<"gemini" | "openai" | "lovable">(() => {
+  const [aiProvider, setAiProvider] = useState<
+    "gemini" | "openai" | "claude" | "deepseek" | "grok" | "lovable"
+  >(() => {
     if (typeof localStorage === "undefined") return "gemini";
     return (localStorage.getItem("lextype-ai-provider") as any) || "gemini";
   });
@@ -309,6 +319,7 @@ function Index() {
     id: 0,
   });
   const [flash, setFlash] = useState<{ key: string; type: "ok" | "err" } | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [comboPulse, setComboPulse] = useState(0);
   const [muted, setMuted] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -432,10 +443,17 @@ function Index() {
     [fetchStudy, loadText, lineCount, reference, aiKey, aiProvider],
   );
 
+  const availableLeiSecaItems = useMemo(() => {
+    return getAllLeiSecaItems(leiSecaEixo);
+  }, [leiSecaEixo]);
+
   const nextLeiSeca = useCallback(
-    (eixoOverride?: string) => {
+    (eixoOverride?: string, forceRandom = false) => {
       const targetEixo = eixoOverride ?? leiSecaEixo;
-      const item = getNextLeiSecaItem(targetEixo, seenLeiSecaIds.current);
+      const isRandom = forceRandom || leiSecaStartingId === "random";
+      const item = isRandom
+        ? getRandomLeiSecaItem(targetEixo, seenLeiSecaIds.current)
+        : getNextLeiSecaItem(targetEixo, seenLeiSecaIds.current);
       seenLeiSecaIds.current.push(item.id);
       if (seenLeiSecaIds.current.length >= LEI_SECA_BANK.length) {
         seenLeiSecaIds.current = [item.id];
@@ -445,7 +463,7 @@ function Index() {
       setCurrentStudy(studyItem);
       loadText(item.texto);
     },
-    [leiSecaEixo, loadText],
+    [leiSecaEixo, leiSecaStartingId, loadText],
   );
 
   const reset = useCallback(
@@ -607,6 +625,10 @@ function Index() {
 
       if (outcome.kind === "correct") {
         playKey();
+        if (flashTimerRef.current) {
+          clearTimeout(flashTimerRef.current);
+          flashTimerRef.current = null;
+        }
         if (COMBO_MILESTONES.includes(e.combo) || (e.combo > 200 && e.combo % 50 === 0)) {
           playCombo();
           setComboPulse((p) => p + 1);
@@ -616,8 +638,13 @@ function Index() {
         if (outcome.finished) finish();
       } else if (outcome.kind === "wrong") {
         playError();
-        const errKey = outcome.keys[outcome.keys.length - 1] ?? "";
-        setFlash({ key: errKey, type: "err" });
+        const pressedKeys = charToKeys(ch, keyboardLayout);
+        const typedKey = pressedKeys[0] || ch.toLowerCase();
+        setFlash({ key: typedKey, type: "err" });
+        if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = setTimeout(() => {
+          setFlash(null);
+        }, 350);
         if (e.errStreak === 3) say("errorStreak");
         else if (e.errStreak === 1 && Math.random() < 0.45) say("error", { k: outcome.expected });
       }
@@ -841,11 +868,11 @@ function Index() {
                 <p className="text-xs text-muted-foreground">Digitação por toque para o Direito</p>
               </div>
             </div>
-            <div className="flex items-center rounded-lg border border-border bg-card p-0.5 sm:p-1">
+            <div className="flex flex-wrap items-center rounded-lg border border-border bg-card p-0.5 sm:p-1 gap-0.5">
               <button
                 onClick={() => setActiveTab("treino")}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-semibold transition-colors",
+                  "flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold transition-colors",
                   activeTab === "treino"
                     ? "bg-gold text-gold-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
@@ -854,15 +881,48 @@ function Index() {
                 ⌨️ Treino
               </button>
               <button
+                onClick={() => setActiveTab("leiseca")}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold transition-colors",
+                  activeTab === "leiseca"
+                    ? "bg-gold text-gold-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                📜 Lei Seca
+              </button>
+              <button
+                onClick={() => setActiveTab("dicionario")}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold transition-colors",
+                  activeTab === "dicionario"
+                    ? "bg-gold text-gold-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                📖 Dicionário
+              </button>
+              <button
                 onClick={() => setActiveTab("desempenho")}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-semibold transition-colors",
+                  "flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold transition-colors",
                   activeTab === "desempenho"
                     ? "bg-gold text-gold-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 📊 Desempenho
+              </button>
+              <button
+                onClick={() => setActiveTab("ranking")}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold transition-colors",
+                  activeTab === "ranking"
+                    ? "bg-gold text-gold-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                🏆 Records
               </button>
             </div>
           </div>
@@ -1132,9 +1192,12 @@ function Index() {
                   }}
                   className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium"
                 >
-                  <option value="gemini">Google Gemini (Recomendado)</option>
+                  <option value="gemini">Google Gemini (Gemini 1.5 Flash)</option>
                   <option value="openai">OpenAI (GPT-4o)</option>
-                  <option value="lovable">Lovable Cloud</option>
+                  <option value="claude">Anthropic Claude (Claude 3.5)</option>
+                  <option value="deepseek">DeepSeek AI (DeepSeek Chat)</option>
+                  <option value="grok">xAI Grok (Grok-2)</option>
+                  <option value="lovable">Lovable Cloud / Local</option>
                 </select>
                 <input
                   type="password"
@@ -1144,7 +1207,17 @@ function Index() {
                     setAiKey(k);
                     localStorage.setItem("lextype-ai-key", k);
                   }}
-                  placeholder="Cole sua API Key do Gemini ou OpenAI..."
+                  placeholder={
+                    aiProvider === "claude"
+                      ? "Cole sua API Key da Anthropic Claude (sk-ant-...)"
+                      : aiProvider === "deepseek"
+                        ? "Cole sua API Key do DeepSeek (sk-...)"
+                        : aiProvider === "grok"
+                          ? "Cole sua API Key da xAI Grok (xai-...)"
+                          : aiProvider === "openai"
+                            ? "Cole sua API Key da OpenAI (sk-...)"
+                            : "Cole sua API Key do Gemini (AIzaSy...)"
+                  }
                   className="min-w-64 flex-1 rounded-md border border-border bg-card px-3 py-1.5 text-xs"
                 />
                 {aiKey && (
@@ -1187,10 +1260,33 @@ function Index() {
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
           <LeiSecaPanel
             onSelectForTyping={(item) => {
+              setCurrentLeiSeca(item);
+              setCurrentStudy(leiSecaToStudyItem(item));
               loadText(item.texto);
               setActiveTab("treino");
             }}
             onClose={() => setActiveTab("treino")}
+          />
+        </main>
+      ) : activeTab === "dicionario" ? (
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+          <DicionarioPanel
+            onSelectForTyping={(text, _termo) => {
+              loadText(text);
+              setActiveTab("treino");
+            }}
+            onClose={() => setActiveTab("treino")}
+          />
+        </main>
+      ) : activeTab === "ranking" ? (
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+          <RankingRecordsPanel
+            stats={keyStats}
+            xp={xp}
+            bestWpm={bestWpm}
+            streak={streak}
+            practiceTodaySeconds={practiceToday}
+            onBackToPractice={() => setActiveTab("treino")}
           />
         </main>
       ) : (
@@ -1394,14 +1490,47 @@ function Index() {
                     </option>
                   ))}
                 </select>
+
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="artigo-inicial" className="text-xs font-medium text-muted-foreground">
+                    Artigo Inicial:
+                  </label>
+                  <select
+                    id="artigo-inicial"
+                    value={leiSecaStartingId}
+                    onChange={(ev) => {
+                      const val = ev.target.value;
+                      setLeiSecaStartingId(val);
+                      if (val === "random") {
+                        nextLeiSeca(leiSecaEixo, true);
+                      } else {
+                        const target = getLeiSecaItemById(val);
+                        if (target) {
+                          setCurrentLeiSeca(target);
+                          const st = leiSecaToStudyItem(target);
+                          setCurrentStudy(st);
+                          loadText(target.texto);
+                        }
+                      }
+                    }}
+                    className="max-w-[210px] sm:max-w-[270px] truncate rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm"
+                  >
+                    <option value="random">🎲 Aleatório (Padrão)</option>
+                    {availableLeiSecaItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.dispositivo} - {item.diploma}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => nextLeiSeca()}
+                  onClick={() => nextLeiSeca(leiSecaEixo, leiSecaStartingId === "random")}
                   className="rounded-md bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm"
                 >
-                  Próximo Artigo →
+                  {leiSecaStartingId === "random" ? "🎲 Sortear Artigo →" : "Próximo Artigo →"}
                 </button>
               </div>
             </div>

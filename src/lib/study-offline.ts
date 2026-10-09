@@ -1,4 +1,5 @@
 import type { StudyItem } from "./study.functions";
+import { DICIONARIO_JURIDICO } from "./dicionario-juridico";
 
 export type OfflineBankEntry = StudyItem & { area: string };
 
@@ -26715,6 +26716,18 @@ export function extractComplexLegalTerm(text: string): {
   categoria: string;
 } | null {
   const lower = (text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  for (const entry of DICIONARIO_JURIDICO) {
+    const termNormalized = entry.termo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (lower.includes(termNormalized)) {
+      return {
+        termo: entry.termo,
+        semantica: entry.significado,
+        significado: entry.significado,
+        virada: entry.viradaChave,
+        categoria: entry.categoria,
+      };
+    }
+  }
   for (const [term, meaning] of Object.entries(LEGAL_TERMS_GLOSSARY)) {
     const termNormalized = term.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (lower.includes(termNormalized)) {
@@ -26817,7 +26830,11 @@ export function offlineStudy(
     return scoreB - scoreA;
   });
 
-  const pool: StudyItem[] = basePool.map((b) => {
+  const fresh = basePool.filter((i) => !seen.includes(i.termo));
+  const candidatePool = fresh.length >= count ? fresh : [...fresh, ...basePool];
+  const selected = candidatePool.slice(0, count);
+
+  return selected.map((b) => {
     const fgv = calculateFgvRecurrence(b);
     const complex = extractComplexLegalTerm(`${b.linha} ${b.termo} ${b.virada.conceito}`);
     const semanticaDecorated = fgv.tag ? `${fgv.tag} — ${b.semantica}` : b.semantica;
@@ -26834,9 +26851,5 @@ export function offlineStudy(
       },
     };
   });
-
-  const fresh = pool.filter((i) => !seen.includes(i.termo));
-  const list = fresh.length >= count ? fresh : [...fresh, ...pool];
-  return list.slice(0, count);
 }
 

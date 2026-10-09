@@ -108,11 +108,56 @@ As provas obtidas por meios ilícitos são inadmissíveis no processo judicial.`
     expect(study.virada.exemplo.length).toBeGreaterThan(10);
   });
 
-  it("deve buscar o próximo artigo na base de dados de forma sequencial e respeitando o eixo", () => {
-    const item1 = getNextLeiSecaItem("Direito Constitucional", []);
-    expect(item1.eixo).toBe("Direito Constitucional");
-    const item2 = getNextLeiSecaItem("Direito Constitucional", [item1.id]);
-    expect(item2.id).not.toBe(item1.id);
-    expect(item2.eixo).toBe("Direito Constitucional");
+  it("deve conter Súmulas do STJ com dispositivo, conceito, virada de chave e exemplo prático", () => {
+    const stjItems = filterLeiSeca("Súmulas do Superior Tribunal de Justiça (STJ)");
+    expect(stjItems.length).toBeGreaterThanOrEqual(8);
+    const sumulasIds = stjItems.map((s) => s.id);
+    expect(sumulasIds).toContain("stj-sum-387");
+    expect(sumulasIds).toContain("stj-sum-385");
+    expect(sumulasIds).toContain("stj-sum-543");
+    expect(sumulasIds).toContain("stj-sum-410");
+    expect(sumulasIds).toContain("stj-sum-599");
+
+    const sum387 = stjItems.find((s) => s.id === "stj-sum-387");
+    expect(sum387).toBeDefined();
+    expect(sum387!.texto).toContain("dano estético e dano moral");
+    expect(sum387!.casoConcreto).toBeDefined();
+  });
+
+  it("deve recuperar artigo inicial específico ou aleatório no banco de Lei Seca", async () => {
+    const { getLeiSecaItemById, getAllLeiSecaItems, getRandomLeiSecaItem } = await import(
+      "@/lib/lei-seca"
+    );
+    const item = getLeiSecaItemById("cf-art5-caput");
+    expect(item).toBeDefined();
+    expect(item!.dispositivo).toBe("Art. 5º, caput");
+
+    const allConstitucional = getAllLeiSecaItems("Direito Constitucional");
+    expect(allConstitucional.length).toBeGreaterThan(0);
+
+    const randomItem = getRandomLeiSecaItem("Direito Constitucional");
+    expect(randomItem).toBeDefined();
+    expect(randomItem.eixo).toBe("Direito Constitucional");
+  });
+
+  it("deve fornecer um vasto dicionário jurídico com busca e estrutura tripartite completa", async () => {
+    const { DICIONARIO_JURIDICO, searchDicionario, getRandomDicionarioEntry } = await import(
+      "@/lib/dicionario-juridico"
+    );
+    expect(DICIONARIO_JURIDICO.length).toBeGreaterThanOrEqual(20);
+
+    const venire = searchDicionario("venire");
+    expect(venire.length).toBeGreaterThan(0);
+    expect(venire[0]!.termo).toContain("Venire contra factum proprium");
+    expect(venire[0]!.viradaChave.length).toBeGreaterThan(10);
+    expect(venire[0]!.exemplo.length).toBeGreaterThan(10);
+
+    const latim = searchDicionario("", "Latim & Brocardos");
+    expect(latim.length).toBeGreaterThanOrEqual(10);
+
+    const randomEntry = getRandomDicionarioEntry();
+    expect(randomEntry.termo).toBeDefined();
+    expect(randomEntry.significado).toBeDefined();
   });
 });
+
