@@ -142,11 +142,142 @@ export const RANKS = [
   "Ministro do STF",
 ];
 
-export function rankOf(xp: number) {
-  const idx = Math.min(RANKS.length - 1, Math.floor(xp / 500));
+export interface RankTier {
+  name: string;
+  minXp: number;
+  minWpm: number;
+  minAccuracy: number;
+  badge: string;
+  description: string;
+}
+
+export const RANK_TIERS: RankTier[] = [
+  {
+    name: "Estagiário",
+    minXp: 0,
+    minWpm: 0,
+    minAccuracy: 0,
+    badge: "🌱",
+    description: "Início da jornada jurídica. Foco na postura e na fileira central do teclado.",
+  },
+  {
+    name: "Bacharel",
+    minXp: 1200,
+    minWpm: 25,
+    minAccuracy: 88,
+    badge: "🎓",
+    description: "Conclusão da graduação. Digitação por toque contínua sem olhar o teclado.",
+  },
+  {
+    name: "Advogado Júnior",
+    minXp: 3500,
+    minWpm: 35,
+    minAccuracy: 90,
+    badge: "⚖️",
+    description: "Inscrição nos quadros da OAB. Petições iniciais e ritmo técnico constante.",
+  },
+  {
+    name: "Advogado Pleno",
+    minXp: 8000,
+    minWpm: 50,
+    minAccuracy: 92,
+    badge: "📜",
+    description: "Domínio de prazos processuais e redação veloz de recursos e contestações.",
+  },
+  {
+    name: "Advogado Sênior",
+    minXp: 16000,
+    minWpm: 65,
+    minAccuracy: 94,
+    badge: "💼",
+    description: "Sustentações orais de alta densidade e cadência de produção refinada.",
+  },
+  {
+    name: "Sócio",
+    minXp: 28000,
+    minWpm: 75,
+    minAccuracy: 95,
+    badge: "🏛️",
+    description: "Liderança de equipe e precisão cirúrgica na digitação de pareceres.",
+  },
+  {
+    name: "Promotor",
+    minXp: 45000,
+    minWpm: 85,
+    minAccuracy: 96,
+    badge: "🛡️",
+    description: "Fiscal da ordem jurídica com velocidade de plantão e argumentação direta.",
+  },
+  {
+    name: "Juiz",
+    minXp: 70000,
+    minWpm: 95,
+    minAccuracy: 97,
+    badge: "⚖️",
+    description: "Prolação célere de sentenças com zero hesitação e foco absoluto.",
+  },
+  {
+    name: "Desembargador",
+    minXp: 105000,
+    minWpm: 105,
+    minAccuracy: 98,
+    badge: "🦅",
+    description: "Voto condutor no Tribunal com cadência de elite e memória muscular plena.",
+  },
+  {
+    name: "Ministro do STF",
+    minXp: 150000,
+    minWpm: 115,
+    minAccuracy: 99,
+    badge: "👑",
+    description: "Pico supremo da carreira: mestre consumado do touch-typing jurídico.",
+  },
+];
+
+export function rankOf(xp: number, wpm = 0, accuracy = 100) {
+  // Encontra a maior patente onde o usuário cumpre os requisitos cumulativos
+  let currentIdx = 0;
+  for (let i = RANK_TIERS.length - 1; i >= 0; i--) {
+    const tier = RANK_TIERS[i]!;
+    // Estagiário (índice 0) é garantido
+    if (i === 0 || (xp >= tier.minXp && (wpm === 0 || wpm >= tier.minWpm) && (accuracy === 0 || accuracy >= tier.minAccuracy))) {
+      currentIdx = i;
+      break;
+    }
+  }
+
+  const currentTier = RANK_TIERS[currentIdx]!;
+  const nextTier = RANK_TIERS[currentIdx + 1];
+
+  let progress = 1;
+  const missingCriteria: string[] = [];
+
+  if (nextTier) {
+    const range = nextTier.minXp - currentTier.minXp;
+    const gainedInTier = Math.max(0, xp - currentTier.minXp);
+    progress = Math.min(1, Math.max(0, gainedInTier / range));
+
+    if (wpm > 0 && wpm < nextTier.minWpm) {
+      missingCriteria.push(`Velocidade: ${wpm}/${nextTier.minWpm} WPM`);
+    }
+    if (accuracy > 0 && accuracy < nextTier.minAccuracy) {
+      missingCriteria.push(`Precisão: ${accuracy}%/${nextTier.minAccuracy}%`);
+    }
+    if (xp < nextTier.minXp) {
+      missingCriteria.push(`XP: ${xp}/${nextTier.minXp}`);
+    }
+  }
+
   return {
-    name: RANKS[idx]!,
-    progress: idx === RANKS.length - 1 ? 1 : (xp % 500) / 500,
-    next: RANKS[idx + 1],
+    name: currentTier.name,
+    badge: currentTier.badge,
+    description: currentTier.description,
+    progress,
+    next: nextTier?.name,
+    nextBadge: nextTier?.badge,
+    currentTier,
+    nextTier,
+    missingCriteria,
+    isMaxRank: !nextTier,
   };
 }

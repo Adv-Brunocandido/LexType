@@ -44,6 +44,48 @@ function score(text: string, target: Set<string>, weak: Set<string>): number {
   return (hits / keys.length) ** 2 * (1 + weakHits * 0.8) + hits * 0.04;
 }
 
+export function calibrateStudyLine(fullLine: string, lines: number): string {
+  if (lines > 1) return fullLine;
+  // Para 1 linha estrita, se a linha for muito longa (> 70 chars), pega a oração principal
+  if (fullLine.length <= 70) return fullLine;
+  const commaIdx = fullLine.indexOf(",", 25);
+  if (commaIdx > 25 && commaIdx < 75) {
+    const slice = fullLine.slice(0, commaIdx).trim();
+    return slice.endsWith(".") ? slice : `${slice}.`;
+  }
+  const words = fullLine.split(" ");
+  let chunk = "";
+  for (const w of words) {
+    if ((chunk + " " + w).trim().length > 65) break;
+    chunk = (chunk + " " + w).trim();
+  }
+  const res = chunk || fullLine;
+  return res.endsWith(".") ? res : `${res}.`;
+}
+
+export function calculateGainedXp(opts: {
+  len?: number;
+  length?: number;
+  accuracy: number;
+  maxCombo: number;
+  mode?: Mode | "estudos";
+  level?: number;
+}): number {
+  const textLength = opts.len ?? opts.length ?? 0;
+  const accuracy = opts.accuracy;
+  const maxCombo = opts.maxCombo;
+  const mode = opts.mode ?? "palavras";
+  const level = opts.level ?? 1;
+
+  // Base XP proporcional com penalidade para acurácia baixa e mérito para acurácia alta
+  const accuracyFactor = accuracy >= 95 ? 1.0 : accuracy >= 88 ? 0.75 : 0.4;
+  const baseXp = Math.round(textLength * 0.6 * accuracyFactor);
+  const comboBonus = 1 + Math.min(0.5, maxCombo / 80);
+  const accuracyBonus = accuracy >= 98 ? 1.4 : accuracy >= 95 ? 1.2 : 1.0;
+  const modeBonus = mode === "automatico" ? 1 + level * 0.05 : mode === "estudos" ? 1.15 : 1.0;
+  return Math.max(10, Math.round(baseXp * comboBonus * accuracyBonus * modeBonus));
+}
+
 export function generateText(opts: {
   mode: Exclude<Mode, "automatico">;
   keys: string[];
@@ -56,8 +98,9 @@ export function generateText(opts: {
   const target = new Set(keys);
   const weakSet = new Set(weak);
   const safeLines = Math.max(1, Math.min(10, lines));
-  const baseCount = 4 + Math.floor(level * 0.6);
-  const count = safeLines === 1 ? Math.max(4, baseCount) : Math.round(baseCount * safeLines * 0.8);
+  // Quando 1 linha: rigorosamente 5 a 7 palavras (para nunca quebrar em 4 linhas)
+  const baseCount = safeLines === 1 ? Math.max(5, Math.min(7, 3 + Math.floor(level * 0.4))) : 4 + Math.floor(level * 0.6);
+  const count = safeLines === 1 ? baseCount : Math.round(baseCount * safeLines * 0.85);
 
   const drill = () => {
     const len = 2 + Math.floor(Math.random() * (1 + Math.floor(level / 3)));
@@ -76,6 +119,10 @@ export function generateText(opts: {
     )
       .sort((a, b) => b[1] - a[1])
       .slice(0, 12);
+    // Para 1 linha: exatamente 1 frase curta
+    if (safeLines === 1 && ranked.length > 0) {
+      return ranked[0]![0];
+    }
     const n = Math.max(1, Math.min(8, safeLines));
     const out = new Set<string>();
     while (out.size < n && out.size < ranked.length) out.add(weightedPick(ranked));

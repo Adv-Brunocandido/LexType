@@ -1,10 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import { Keyboard, type KeyboardScale } from "@/components/Keyboard";
 import { KEY_GROUPS, TRAINABLE_KEYS, charToKeys, strip, type KeyboardLayout } from "@/lib/abnt2";
 import { professorSays, rankOf, type Mood } from "@/lib/professor";
-import { playCombo, playError, playKey, playWin, soundSettings } from "@/lib/sound";
+import {
+  playCombo,
+  playError,
+  playKey,
+  playWin,
+  setSoundProfile,
+  soundSettings,
+  SOUND_PROFILES,
+  type SoundProfile,
+} from "@/lib/sound";
 import { generateStudy, type StudyItem } from "@/lib/study.functions";
 import { offlineStudy } from "@/lib/study-offline";
 import {
@@ -21,6 +31,8 @@ import {
   streakDays,
   weakestKeys,
   applyModifiers,
+  calibrateStudyLine,
+  calculateGainedXp,
   type TextModifiers,
   type KeyStats,
   type Mode,
@@ -126,6 +138,20 @@ interface SessionResult {
 
 const COMBO_MILESTONES = [10, 25, 50, 75, 100, 150, 200];
 
+const TYPING_FONT_CLASSES: Record<"sm" | "md" | "lg" | "xl", string> = {
+  sm: "text-lg sm:text-xl",
+  md: "text-xl sm:text-2xl",
+  lg: "text-2xl sm:text-3xl",
+  xl: "text-3xl sm:text-4xl",
+};
+
+const STUDY_FONT_CLASSES: Record<"sm" | "md" | "lg" | "xl", string> = {
+  sm: "text-xs sm:text-sm leading-relaxed",
+  md: "text-sm sm:text-base leading-relaxed",
+  lg: "text-base sm:text-lg leading-relaxed",
+  xl: "text-lg sm:text-xl leading-relaxed",
+};
+
 function Index() {
   const [selectedKeys, setSelectedKeys] = useState<string[]>(KEY_GROUPS.Central);
   const [mode, setMode] = useState<FullMode>("automatico");
@@ -146,6 +172,36 @@ function Index() {
   const [repeat, setRepeat] = useState(false);
   const [pinned, setPinned] = useState<StudyItem | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState<"treino" | "desempenho">("treino");
+
+  // Tamanhos de fonte individuais por caixa
+  const [fontTyping, setFontTyping] = useState<"sm" | "md" | "lg" | "xl">(() => {
+    if (typeof localStorage === "undefined") return "md";
+    return (localStorage.getItem("lextype-font-typing") as any) || "md";
+  });
+  const [fontStudy, setFontStudy] = useState<"sm" | "md" | "lg" | "xl">(() => {
+    if (typeof localStorage === "undefined") return "md";
+    return (localStorage.getItem("lextype-font-study") as any) || "md";
+  });
+
+  // Layout modular desacoplado (lado a lado vs empilhado)
+  const [layoutSplit, setLayoutSplit] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return false;
+    return localStorage.getItem("lextype-layout-split") === "1";
+  });
+
+  // Perfil de som de teclado mecânico
+  const [soundProfile, setSoundProfileState] = useState<SoundProfile>(() => soundSettings.profile);
+
+  // Configurações locais de IA
+  const [aiProvider, setAiProvider] = useState<"gemini" | "openai" | "lovable">(() => {
+    if (typeof localStorage === "undefined") return "gemini";
+    return (localStorage.getItem("lextype-ai-provider") as any) || "gemini";
+  });
+  const [aiKey, setAiKey] = useState<string>(() => {
+    if (typeof localStorage === "undefined") return "";
+    return localStorage.getItem("lextype-ai-key") || "";
+  });
 
   // Customizações de visual e teclado
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -258,7 +314,8 @@ function Index() {
         const [item, ...rest] = queue;
         setStudyQueue(rest);
         setCurrentStudy(item!);
-        loadText(item!.linha);
+        const lineToLoad = activeCount === 1 ? calibrateStudyLine(item!.linha, 1) : item!.linha;
+        loadText(lineToLoad);
         return;
       }
       setStudyLoading(true);
@@ -272,6 +329,8 @@ function Index() {
             seen: seenTerms.current.slice(-20),
             count: activeCount,
             reference: reference?.text,
+            userApiKey: aiKey || undefined,
+            userApiProvider: aiProvider || undefined,
           },
         });
         const items = r.itens.length ? r.itens : offlineStudy(ar, activeCount, seenTerms.current);
@@ -288,7 +347,8 @@ function Index() {
           const [item, ...rest] = items;
           setStudyQueue(rest);
           setCurrentStudy(item!);
-          loadText(item!.linha);
+          const lineToLoad = activeCount === 1 ? calibrateStudyLine(item!.linha, 1) : item!.linha;
+          loadText(lineToLoad);
         }
       } catch {
         setStudyError("Sem conexão com a IA. Usando o banco offline do professor.");
@@ -304,13 +364,14 @@ function Index() {
           const [item, ...rest] = items;
           setStudyQueue(rest);
           setCurrentStudy(item!);
-          loadText(item!.linha);
+          const lineToLoad = activeCount === 1 ? calibrateStudyLine(item!.linha, 1) : item!.linha;
+          loadText(lineToLoad);
         }
       } finally {
         setStudyLoading(false);
       }
     },
-    [fetchStudy, loadText, lineCount, reference],
+    [fetchStudy, loadText, lineCount, reference, aiKey, aiProvider],
   );
 
   const reset = useCallback(
@@ -421,13 +482,12 @@ function Index() {
     saveNum(todayKey(), practiced);
     setPracticeToday(practiced);
     const bonus = accuracy >= 97 ? 1.5 : accuracy >= 95 ? 1.25 : 1;
-    const gained = Math.round(
-      bonus *
-        len *
-        (accuracy / 100) *
-        (1 + e.maxCombo / 40) *
-        (mode === "automatico" ? 1 + level / 10 : 1),
-    );
+    const gained = calculateGainedXp({
+      length: len,
+      accuracy,
+      maxCombo: e.maxCombo,
+      level: mode === "automatico" ? level : 1,
+    });
     const newXp = xp + gained;
     setXp(newXp);
     saveNum("lextype-xp", newXp);
@@ -651,7 +711,7 @@ function Index() {
   const liveAcc = pos > 0 ? Math.round((pos / (pos + e.errors)) * 100) : 100;
   const nextKeys = !result && e.text[pos] ? charToKeys(e.text[pos]!, keyboardLayout) : [];
   const weak = useMemo(() => weakestKeys(keyStats, TRAINABLE_KEYS, 3), [keyStats]);
-  const rank = rankOf(xp);
+  const rank = rankOf(xp, bestWpm, liveAcc);
   const inFlow = running && !result;
   const progress = e.text.length ? pos / e.text.length : 0;
 
@@ -665,19 +725,47 @@ function Index() {
         )}
       >
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold font-mono-type text-lg font-bold text-gold-foreground">
-              §
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold font-mono-type text-lg font-bold text-gold-foreground">
+                §
+              </div>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight">LexType</h1>
+                <p className="text-xs text-muted-foreground">Digitação por toque para o Direito</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight">LexType</h1>
-              <p className="text-xs text-muted-foreground">Digitação por toque para o Direito</p>
+            <div className="flex items-center rounded-lg border border-border bg-card p-0.5 sm:p-1">
+              <button
+                onClick={() => setActiveTab("treino")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-semibold transition-colors",
+                  activeTab === "treino"
+                    ? "bg-gold text-gold-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                ⌨️ Treino
+              </button>
+              <button
+                onClick={() => setActiveTab("desempenho")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-semibold transition-colors",
+                  activeTab === "desempenho"
+                    ? "bg-gold text-gold-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                📊 Desempenho
+              </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-sm sm:gap-6">
             <div className="min-w-36">
               <div className="flex justify-between text-xs">
-                <span className="font-semibold text-gold">{rank.name}</span>
+                <span className="font-semibold text-gold">
+                  {rank.badge} {rank.name}
+                </span>
                 <span className="font-mono-type text-muted-foreground">{xp} XP</span>
               </div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
@@ -687,8 +775,11 @@ function Index() {
                 />
               </div>
               {rank.next && (
-                <div className="mt-0.5 text-[0.65rem] text-muted-foreground">
-                  próx.: {rank.next}
+                <div
+                  className="mt-0.5 text-[0.65rem] text-muted-foreground truncate max-w-44"
+                  title={rank.missingCriteria.length ? rank.missingCriteria.join(" | ") : undefined}
+                >
+                  próx.: {rank.nextBadge} {rank.next}
                 </div>
               )}
             </div>
@@ -849,12 +940,37 @@ function Index() {
                       : "Modo Fluido (corrige com Backspace)"
                   }
                 />
-                <button
-                  onClick={toggleMute}
-                  className="rounded-md border border-border px-3 py-1 text-xs hover:bg-secondary block mt-2"
-                >
-                  {muted ? "🔇 Som desligado" : "🔊 Som ligado"}
-                </button>
+                <div className="flex flex-col gap-1.5 mt-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleMute}
+                      className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-secondary"
+                    >
+                      {muted ? "🔇 Mudo" : "🔊 Som"}
+                    </button>
+                    <select
+                      value={soundProfile}
+                      onChange={(ev) => {
+                        const p = ev.target.value as SoundProfile;
+                        setSoundProfile(p);
+                        setSoundProfileState(p);
+                        playKey();
+                      }}
+                      disabled={muted}
+                      className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium disabled:opacity-40"
+                      title="Perfil sonoro das teclas"
+                    >
+                      {SOUND_PROFILES.map((prof) => (
+                        <option key={prof.id} value={prof.id}>
+                          {prof.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="text-[0.65rem] text-muted-foreground">
+                    {SOUND_PROFILES.find((p) => p.id === soundProfile)?.description}
+                  </span>
+                </div>
               </div>
 
               {/* Complexidade do Texto */}
@@ -881,11 +997,68 @@ function Index() {
                 </div>
               </div>
             </div>
+
+            {/* Conexão com IAs & Chave Local */}
+            <div className="rounded-lg border border-gold/30 bg-gold/5 p-3.5 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-xs uppercase tracking-wider text-gold">
+                  🤖 Conexão com IAs (Gemini / OpenAI / Lovable)
+                </span>
+                <span className="text-[0.65rem] text-muted-foreground">
+                  🔒 Salva com segurança apenas no seu navegador (localStorage)
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={aiProvider}
+                  onChange={(ev) => {
+                    const p = ev.target.value as any;
+                    setAiProvider(p);
+                    localStorage.setItem("lextype-ai-provider", p);
+                  }}
+                  className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium"
+                >
+                  <option value="gemini">Google Gemini (Recomendado)</option>
+                  <option value="openai">OpenAI (GPT-4o)</option>
+                  <option value="lovable">Lovable Cloud</option>
+                </select>
+                <input
+                  type="password"
+                  value={aiKey}
+                  onChange={(ev) => {
+                    const k = ev.target.value;
+                    setAiKey(k);
+                    localStorage.setItem("lextype-ai-key", k);
+                  }}
+                  placeholder="Cole sua API Key do Gemini ou OpenAI..."
+                  className="min-w-64 flex-1 rounded-md border border-border bg-card px-3 py-1.5 text-xs"
+                />
+                {aiKey && (
+                  <button
+                    onClick={() => {
+                      setAiKey("");
+                      localStorage.removeItem("lextype-ai-key");
+                    }}
+                    className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs text-destructive hover:bg-destructive/20"
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+              <p className="text-[0.7rem] text-muted-foreground">
+                Se você não informar uma chave de IA ou estiver sem rede, o LexType funciona 100% autônomo com as 2.220 viradas de chave e questões da OAB incorporadas no app.
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+      {activeTab === "desempenho" ? (
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+          <AnalyticsDashboard onBackToPractice={() => setActiveTab("treino")} />
+        </main>
+      ) : (
+        <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {/* Modos */}
         <div
           className={cn(
@@ -1047,107 +1220,198 @@ function Index() {
           </div>
         )}
 
-        {/* Área de digitação redimensionável */}
-        <section
-          onClick={() => inputRef.current?.focus()}
-          style={{
-            minHeight: `${Math.max(9, 5.5 + lineCount * 2.8)}rem`,
-            maxHeight: "75vh",
-          }}
+        {/* Controles de Cabeçalho da Área de Digitação & Modularidade */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <span>Área de Digitação</span>
+            {lineCount === 1 && (
+              <span className="rounded bg-gold/15 px-2 py-0.5 text-[0.65rem] font-bold text-gold">
+                Linha Única Estrita
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Controle de Fonte da Caixa de Digitação */}
+            <div className="flex items-center rounded-md border border-border bg-card text-xs">
+              <span className="px-2 py-0.5 text-[0.65rem] text-muted-foreground">Fonte:</span>
+              <button
+                onClick={() => {
+                  const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                  const idx = Math.max(0, sizes.indexOf(fontTyping) - 1);
+                  setFontTyping(sizes[idx]!);
+                  localStorage.setItem("lextype-font-typing", sizes[idx]!);
+                }}
+                disabled={fontTyping === "sm"}
+                className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 border-r border-border font-bold"
+                title="Diminuir fonte da digitação"
+              >
+                A−
+              </button>
+              <button
+                onClick={() => {
+                  const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                  const idx = Math.min(sizes.length - 1, sizes.indexOf(fontTyping) + 1);
+                  setFontTyping(sizes[idx]!);
+                  localStorage.setItem("lextype-font-typing", sizes[idx]!);
+                }}
+                disabled={fontTyping === "xl"}
+                className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 font-bold"
+                title="Aumentar fonte da digitação"
+              >
+                A+
+              </button>
+            </div>
+            {/* Toggle Layout Lado a Lado / Empilhado */}
+            <button
+              onClick={() => {
+                setLayoutSplit((s) => {
+                  const next = !s;
+                  localStorage.setItem("lextype-layout-split", next ? "1" : "0");
+                  return next;
+                });
+              }}
+              className={cn(
+                "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                layoutSplit
+                  ? "border-gold bg-gold/15 text-gold"
+                  : "border-border bg-card text-muted-foreground hover:bg-secondary",
+              )}
+              title="Alternar entre layout empilhado ou lado a lado com a aula jurídica"
+            >
+              {layoutSplit ? "⚏ Lado a Lado" : "☰ Empilhado"}
+            </button>
+          </div>
+        </div>
+
+        {/* Estrutura modular desacoplada: Lado a Lado vs Empilhado */}
+        <div
           className={cn(
-            "relative rounded-xl border bg-card p-5 transition-all duration-300 sm:p-8 resize-y overflow-auto",
-            focused ? "border-gold/50 ring-2 ring-ring/30" : "border-border",
+            layoutSplit && pinned
+              ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start"
+              : "space-y-6",
           )}
         >
-          {result ? (
-            <ResultView result={result} weak={weak} repeat={repeat} onNext={goNext} />
-          ) : (
-            <>
-              <div className="mb-2 h-1 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full bg-gold transition-all duration-150"
-                  style={{ width: `${progress * 100}%` }}
+          {/* Caixa de Digitação Redimensionável */}
+          <section
+            onClick={() => inputRef.current?.focus()}
+            style={{
+              minHeight: lineCount === 1 ? "5.5rem" : `${Math.max(8.5, 4.5 + lineCount * 2.8)}rem`,
+              maxHeight: lineCount === 1 ? "8.5rem" : "75vh",
+            }}
+            className={cn(
+              "relative rounded-xl border bg-card p-5 transition-all duration-300 sm:p-8 resize overflow-auto",
+              focused ? "border-gold/50 ring-2 ring-ring/30" : "border-border",
+            )}
+          >
+            {result ? (
+              <ResultView result={result} weak={weak} repeat={repeat} onNext={goNext} />
+            ) : (
+              <>
+                <div className="mb-2 h-1 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full bg-gold transition-all duration-150"
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                </div>
+                <div className="mb-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-mono-type text-sm">
+                  <span className="text-muted-foreground">
+                    PPM <span className="font-bold text-gold">{liveWpm}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Precisão <span className="font-bold text-foreground">{liveAcc}%</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Tempo <span className="font-bold text-foreground">{elapsed.toFixed(0)}s</span>
+                  </span>
+                  <span
+                    key={comboPulse}
+                    className={cn(
+                      "animate-combo text-muted-foreground",
+                      e.combo >= 10 && "text-gold",
+                    )}
+                  >
+                    Combo <span className="font-bold">{e.combo}</span>
+                    {e.combo >= 25 ? " 🔥" : ""}
+                    {e.combo >= 50 ? "🔥" : ""}
+                  </span>
+                </div>
+                {studyLoading ? (
+                  <p className="py-6 text-center text-muted-foreground">
+                    O professor está preparando a aula de {effectiveArea}…
+                  </p>
+                ) : (
+                  <p
+                    className={cn(
+                      "font-mono-type leading-relaxed tracking-wide transition-all",
+                      TYPING_FONT_CLASSES[fontTyping],
+                      lineCount === 1 && "overflow-hidden",
+                    )}
+                  >
+                    {e.text.split("").map((ch, i) => {
+                      const isErrorMark = e.marks[i] === true;
+                      return (
+                        <span
+                          key={i}
+                          className={cn(
+                            i < pos &&
+                              (isErrorMark
+                                ? "rounded-sm bg-destructive/25 text-destructive font-bold underline"
+                                : "text-muted-foreground/40"),
+                            i === pos &&
+                              (prefs.stopOnError && e.wrongAt === i
+                                ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake"
+                                : "rounded-sm bg-gold/30 text-gold animate-caret"),
+                            i > pos && "text-foreground",
+                          )}
+                        >
+                          {ch === " " && i === pos ? "␣" : ch}
+                        </span>
+                      );
+                    })}
+                  </p>
+                )}
+                <p className="mt-5 text-center text-xs text-muted-foreground">
+                  {focused
+                    ? prefs.stopOnError
+                      ? "Modo estrito: o cursor trava na letra errada até você acertar."
+                      : "Modo fluido: continue digitando e use Backspace para retornar e corrigir as letras em vermelho."
+                    : "🎯 A velocidade surge da precisão. Clique ou toque aqui para começar."}
+                </p>
+                <input
+                  ref={inputRef}
+                  aria-label="Área de digitação"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  enterKeyHint="next"
+                  className="absolute inset-0 h-full w-full cursor-text opacity-0"
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  onCompositionStart={() => (composing.current = true)}
+                  onCompositionEnd={(ev) => {
+                    composing.current = false;
+                    handleInput(ev.currentTarget, true);
+                  }}
+                  onInput={(ev) => handleInput(ev.currentTarget, false)}
                 />
-              </div>
-              <div className="mb-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-mono-type text-sm">
-                <span className="text-muted-foreground">
-                  PPM <span className="font-bold text-gold">{liveWpm}</span>
-                </span>
-                <span className="text-muted-foreground">
-                  Precisão <span className="font-bold text-foreground">{liveAcc}%</span>
-                </span>
-                <span className="text-muted-foreground">
-                  Tempo <span className="font-bold text-foreground">{elapsed.toFixed(0)}s</span>
-                </span>
-                <span
-                  key={comboPulse}
-                  className={cn(
-                    "animate-combo text-muted-foreground",
-                    e.combo >= 10 && "text-gold",
-                  )}
-                >
-                  Combo <span className="font-bold">{e.combo}</span>
-                  {e.combo >= 25 ? " 🔥" : ""}
-                  {e.combo >= 50 ? "🔥" : ""}
-                </span>
-              </div>
-              {studyLoading ? (
-                <p className="py-6 text-center text-muted-foreground">
-                  O professor está preparando a aula de {effectiveArea}…
-                </p>
-              ) : (
-                <p className="font-mono-type text-xl leading-relaxed tracking-wide sm:text-2xl">
-                  {e.text.split("").map((ch, i) => {
-                    const isErrorMark = e.marks[i] === true;
-                    return (
-                      <span
-                        key={i}
-                        className={cn(
-                          i < pos &&
-                            (isErrorMark
-                              ? "rounded-sm bg-destructive/25 text-destructive font-bold underline"
-                              : "text-muted-foreground/40"),
-                          i === pos &&
-                            (prefs.stopOnError && e.wrongAt === i
-                              ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake"
-                              : "rounded-sm bg-gold/30 text-gold animate-caret"),
-                          i > pos && "text-foreground",
-                        )}
-                      >
-                        {ch === " " && i === pos ? "␣" : ch}
-                      </span>
-                    );
-                  })}
-                </p>
-              )}
-              <p className="mt-5 text-center text-xs text-muted-foreground">
-                {focused
-                  ? prefs.stopOnError
-                    ? "Modo estrito: o cursor trava na letra errada até você acertar."
-                    : "Modo fluido: continue digitando e use Backspace para retornar e corrigir as letras em vermelho."
-                  : "🎯 A velocidade surge da precisão. Clique ou toque aqui para começar."}
-              </p>
-              <input
-                ref={inputRef}
-                aria-label="Área de digitação"
-                autoCapitalize="none"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck={false}
-                enterKeyHint="next"
-                className="absolute inset-0 h-full w-full cursor-text opacity-0"
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                onCompositionStart={() => (composing.current = true)}
-                onCompositionEnd={(ev) => {
-                  composing.current = false;
-                  handleInput(ev.currentTarget, true);
-                }}
-                onInput={(ev) => handleInput(ev.currentTarget, false)}
-              />
-            </>
+              </>
+            )}
+          </section>
+
+          {/* Aula e Virada de chave em destaque (renderizada aqui quando split) */}
+          {layoutSplit && pinned && (
+            <LessonCard
+              item={pinned}
+              onClose={() => setPinned(null)}
+              fontStudy={fontStudy}
+              onFontChange={(f) => {
+                setFontStudy(f);
+                localStorage.setItem("lextype-font-study", f);
+              }}
+            />
           )}
-        </section>
+        </div>
 
         {/* Controles rápidos */}
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -1174,8 +1438,18 @@ function Index() {
           )}
         </div>
 
-        {/* Aula e Virada de chave em destaque */}
-        {pinned && <LessonCard item={pinned} onClose={() => setPinned(null)} />}
+        {/* Aula e Virada de chave em destaque (quando empilhado) */}
+        {!layoutSplit && pinned && (
+          <LessonCard
+            item={pinned}
+            onClose={() => setPinned(null)}
+            fontStudy={fontStudy}
+            onFontChange={(f) => {
+              setFontStudy(f);
+              localStorage.setItem("lextype-font-study", f);
+            }}
+          />
+        )}
 
         {/* Teclado Virtual com suporte a Redimensionamento */}
         <section className="rounded-xl border border-border bg-card p-4 sm:p-6 resize-y overflow-auto min-h-[260px]">
@@ -1264,6 +1538,7 @@ function Index() {
           />
         </section>
       </main>
+      )}
     </div>
   );
 }
@@ -1318,22 +1593,61 @@ function Legend({ cls, label }: { cls: string; label: string }) {
   );
 }
 
-function LessonCard({ item, onClose }: { item: StudyItem; onClose: () => void }) {
+function LessonCard({
+  item,
+  onClose,
+  fontStudy,
+  onFontChange,
+}: {
+  item: StudyItem;
+  onClose: () => void;
+  fontStudy: "sm" | "md" | "lg" | "xl";
+  onFontChange: (f: "sm" | "md" | "lg" | "xl") => void;
+}) {
   return (
-    <div className="animate-pop-in relative space-y-4 rounded-xl border border-gold/40 bg-gold/5 p-5 resize-y overflow-auto shadow-sm">
-      <button
-        onClick={onClose}
-        className="absolute right-3 top-3 rounded-md px-2 text-muted-foreground hover:text-foreground"
-        aria-label="Fechar aula"
-      >
-        ✕
-      </button>
-      <div>
+    <div className="animate-pop-in relative space-y-4 rounded-xl border border-gold/40 bg-gold/5 p-5 resize overflow-auto shadow-sm min-h-[220px]">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded bg-gold/20 px-2.5 py-1 text-xs font-bold text-gold uppercase tracking-wider">
             {item.virada.titulo || item.termo}
           </span>
           <span className="text-xs text-muted-foreground font-mono-type">{item.semantica}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border border-border bg-card text-xs">
+            <span className="px-2 py-0.5 text-[0.65rem] text-muted-foreground">Fonte:</span>
+            <button
+              onClick={() => {
+                const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                const idx = Math.max(0, sizes.indexOf(fontStudy) - 1);
+                onFontChange(sizes[idx]!);
+              }}
+              disabled={fontStudy === "sm"}
+              className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 border-r border-border font-bold"
+              title="Diminuir fonte do estudo"
+            >
+              A−
+            </button>
+            <button
+              onClick={() => {
+                const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                const idx = Math.min(sizes.length - 1, sizes.indexOf(fontStudy) + 1);
+                onFontChange(sizes[idx]!);
+              }}
+              disabled={fontStudy === "xl"}
+              className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 font-bold"
+              title="Aumentar fonte do estudo"
+            >
+              A+
+            </button>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-muted-foreground hover:text-foreground text-xs font-semibold"
+            aria-label="Fechar aula"
+          >
+            ✕
+          </button>
         </div>
       </div>
       {item.virada.conceito && (
@@ -1341,7 +1655,7 @@ function LessonCard({ item, onClose }: { item: StudyItem; onClose: () => void })
           <div className="text-xs font-bold uppercase tracking-wider text-gold mb-1">
             📖 Conceito & Distinção
           </div>
-          <p className="text-sm leading-relaxed text-foreground">
+          <p className={cn("text-foreground", STUDY_FONT_CLASSES[fontStudy])}>
             {item.virada.conceito}
           </p>
         </div>
@@ -1350,7 +1664,7 @@ function LessonCard({ item, onClose }: { item: StudyItem; onClose: () => void })
         <div className="text-xs font-bold uppercase tracking-wider text-gold mb-1">
           💡 Virada de Chave (Critério Decisivo)
         </div>
-        <p className="text-sm leading-relaxed text-foreground">
+        <p className={cn("text-foreground font-medium", STUDY_FONT_CLASSES[fontStudy])}>
           {item.virada.raciocinio}
         </p>
       </div>
@@ -1358,7 +1672,7 @@ function LessonCard({ item, onClose }: { item: StudyItem; onClose: () => void })
         <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
           ⚖️ Exemplo no Caso Concreto
         </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className={cn("text-muted-foreground", STUDY_FONT_CLASSES[fontStudy])}>
           {item.virada.exemplo}
         </p>
       </div>

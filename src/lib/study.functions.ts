@@ -54,12 +54,25 @@ export const generateStudy = createServerFn({ method: "POST" })
         seen: z.array(z.string().max(120)).max(30),
         count: z.number().int().min(1).max(10),
         reference: z.string().max(30000).optional(),
+        userApiKey: z.string().max(300).optional(),
+        userApiProvider: z.enum(["gemini", "openai", "lovable"]).optional(),
       })
       .parse(d),
   )
   .handler(async ({ data }): Promise<{ itens: StudyItem[]; error?: string }> => {
-    const apiKey = process.env["LOVABLE_API_KEY"];
-    if (!apiKey) return { itens: [], error: "IA não configurada." };
+    // 1. Identifica provedor e chave de API
+    const geminiKey =
+      (data.userApiProvider === "gemini" && data.userApiKey) ||
+      process.env["GEMINI_API_KEY"] ||
+      process.env["GOOGLE_API_KEY"];
+
+    const openaiKey =
+      (data.userApiProvider === "openai" && data.userApiKey) ||
+      process.env["OPENAI_API_KEY"];
+
+    const lovableKey =
+      (data.userApiProvider === "lovable" && data.userApiKey) ||
+      process.env["LOVABLE_API_KEY"];
 
     const prompt = `Área do Direito: ${data.area}.
 Teclas que o aluno está treinando: ${data.keys.join(" ") || "todas"}.
@@ -70,65 +83,143 @@ Gere exatamente ${data.count} itens. Cada item:
 - linha: frase jurídica em português, minúsculas, 40 a 90 caracteres, sem aspas nem travessões, usando preferencialmente palavras ricas nas teclas treinadas, contendo o termo.
 - termo: o termo técnico central da linha.
 - semantica: significado técnico-jurídico preciso do termo e sua etimologia quando útil (máx. 2 frases).
-- virada: uma "virada de chave" extremamente avançada e prática da área, que mesmo advogados experientes erram, com base legal real e precisa (artigos de lei, súmulas, temas repetitivos). titulo curto; raciocinio (2-3 frases, o princípio que define a questão); exemplo (caso concreto curto mostrando a consequência prática do erro).
-Seja rigorosamente correto quanto à legislação brasileira vigente. Responda em JSON.`;
+- virada: uma "virada de chave" extremamente prática e técnica da área da FGV OAB:
+  - titulo: nome do conceito em Title Case sem nomes de pessoas fictícias;
+  - conceito: explica o instituto e diferencia de figuras próximas;
+  - raciocinio: o critério jurídico decisivo que resolve o caso e exceções;
+  - exemplo: caso prático curto e completo mostrando a consequência concreta.
+Seja rigorosamente correto quanto à legislação brasileira vigente. Responda em JSON válido com formato { "itens": [...] }.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-6-astra",
-        stream: true,
-        store: false,
-        reasoning: { effort: "low" },
-        instructions: "Você é um professor catedrático de Direito brasileiro, preciso e técnico.",
-        input: prompt,
-        text: { format: { type: "json_schema", name: "estudo", strict: true, schema } },
-      }),
-    });
+    // 2. Chamada via Google Gemini
+    if (geminiKey) {
+      try {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.3,
+              },
+            }),
+          },
+        );
 
-    if (!res.ok || !res.body) {
-      const body = await res.text().catch(() => "");
-      console.error(`AI gateway error [${res.status}]: ${body}`);
-      const msg =
-        res.status === 429
-          ? "Muitas requisições, tente em instantes."
-          : res.status === 402
-            ? "Créditos de IA esgotados."
-            : `Falha ao gerar conteúdo (${res.status}).`;
-      return { itens: [], error: msg };
-    }
-
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    let out = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const ev = JSON.parse(payload);
-          if (ev.type === "response.output_text.delta") out += ev.delta;
-        } catch {
-          /* frame incompleto */
+        if (geminiRes.ok) {
+          const geminiData = (await geminiRes.json()) as any;
+          const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            const parsed = JSON.parse(text) as { itens: StudyItem[] };
+            if (Array.isArray(parsed.itens) && parsed.itens.length > 0) {
+              return { itens: parsed.itens.slice(0, data.count) };
+            }
+          }
         }
+      } catch (err) {
+        console.warn("Falha na chamada Gemini API:", err);
       }
     }
-    try {
-      const parsed = JSON.parse(out) as { itens: StudyItem[] };
-      return { itens: parsed.itens.slice(0, data.count) };
-    } catch {
-      return { itens: [], error: "Resposta da IA inválida." };
+
+    // 3. Chamada via OpenAI
+    if (openaiKey) {
+      try {
+        const oaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: "Você é um professor catedrático de Direito brasileiro, preciso e técnico.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.3,
+          }),
+        });
+
+        if (oaiRes.ok) {
+          const oaiData = (await oaiRes.json()) as any;
+          const content = oaiData.choices?.[0]?.message?.content;
+          if (content) {
+            const parsed = JSON.parse(content) as { itens: StudyItem[] };
+            if (Array.isArray(parsed.itens) && parsed.itens.length > 0) {
+              return { itens: parsed.itens.slice(0, data.count) };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Falha na chamada OpenAI API:", err);
+      }
     }
+
+    // 4. Chamada via Lovable Gateway
+    if (lovableKey) {
+      try {
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lovableKey}`,
+            "Content-Type": "application/json",
+            "X-Lovable-AIG-SDK": "fetch",
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-6-astra",
+            stream: true,
+            store: false,
+            reasoning: { effort: "low" },
+            instructions: "Você é um professor catedrático de Direito brasileiro, preciso e técnico.",
+            input: prompt,
+            text: { format: { type: "json_schema", name: "estudo", strict: true, schema } },
+          }),
+        });
+
+        if (res.ok && res.body) {
+          const reader = res.body.getReader();
+          const dec = new TextDecoder();
+          let buf = "";
+          let out = "";
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.startsWith("data:")) continue;
+              const payload = line.slice(5).trim();
+              if (!payload || payload === "[DONE]") continue;
+              try {
+                const ev = JSON.parse(payload);
+                if (ev.type === "response.output_text.delta") out += ev.delta;
+              } catch {
+                /* frame incompleto */
+              }
+            }
+          }
+          const parsed = JSON.parse(out) as { itens: StudyItem[] };
+          if (Array.isArray(parsed.itens) && parsed.itens.length > 0) {
+            return { itens: parsed.itens.slice(0, data.count) };
+          }
+        }
+      } catch (err) {
+        console.warn("Falha na chamada Lovable Gateway:", err);
+      }
+    }
+
+    // 5. Se nenhuma chave for encontrada ou falhar
+    const errorMsg =
+      !geminiKey && !openaiKey && !lovableKey
+        ? "Nenhuma chave de IA detectada. Você pode inserir sua chave nas configurações do app ou rodar localmente com .env. Usando banco offline da OAB."
+        : "Provedor de IA temporariamente indisponível. Usando o banco offline da OAB.";
+
+    return { itens: [], error: errorMsg };
   });
