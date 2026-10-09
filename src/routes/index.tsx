@@ -19,7 +19,13 @@ import { generateStudy, type StudyItem } from "@/lib/study.functions";
 import { offlineStudy, extractComplexLegalTerm } from "@/lib/study-offline";
 import { LeiSecaPanel } from "@/components/LeiSecaPanel";
 import { MovableCard } from "@/components/MovableCard";
-import type { LeiSecaItem } from "@/lib/lei-seca";
+import {
+  type LeiSecaItem,
+  LEI_SECA_EIXOS,
+  LEI_SECA_BANK,
+  leiSecaToStudyItem,
+  getNextLeiSecaItem,
+} from "@/lib/lei-seca";
 import {
   adaptiveRoute,
   coachingTip,
@@ -75,7 +81,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type FullMode = Mode | "estudos";
+type FullMode = Mode | "estudos" | "leiseca";
 
 const MODES: { id: FullMode; label: string; hint: string }[] = [
   {
@@ -87,6 +93,11 @@ const MODES: { id: FullMode; label: string; hint: string }[] = [
     id: "estudos",
     label: "🎓 Estudos avançados",
     hint: "Digite linhas de uma área do Direito e aprenda viradas de chave",
+  },
+  {
+    id: "leiseca",
+    label: "📜 Lei Seca",
+    hint: "Artigos da CF/88, Códigos e Súmulas com viradas de chave e atualidades",
   },
   { id: "aquecimento", label: "Aquecimento", hint: "Bigramas e trigramas com as teclas-alvo" },
   { id: "palavras", label: "Palavras jurídicas", hint: "Termos do Direito filtrados pelas teclas" },
@@ -181,6 +192,9 @@ function Index() {
   const [pinned, setPinned] = useState<StudyItem | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState<"treino" | "leiseca" | "desempenho">("treino");
+  const [leiSecaEixo, setLeiSecaEixo] = useState<string>("Todos os Eixos");
+  const [currentLeiSeca, setCurrentLeiSeca] = useState<LeiSecaItem | null>(null);
+  const seenLeiSecaIds = useRef<string[]>([]);
 
   // Ordem das caixas movíveis e reposicionáveis na tela
   const [boxOrder, setBoxOrder] = useState<string[]>(() => {
@@ -418,6 +432,22 @@ function Index() {
     [fetchStudy, loadText, lineCount, reference, aiKey, aiProvider],
   );
 
+  const nextLeiSeca = useCallback(
+    (eixoOverride?: string) => {
+      const targetEixo = eixoOverride ?? leiSecaEixo;
+      const item = getNextLeiSecaItem(targetEixo, seenLeiSecaIds.current);
+      seenLeiSecaIds.current.push(item.id);
+      if (seenLeiSecaIds.current.length >= LEI_SECA_BANK.length) {
+        seenLeiSecaIds.current = [item.id];
+      }
+      setCurrentLeiSeca(item);
+      const studyItem = leiSecaToStudyItem(item);
+      setCurrentStudy(studyItem);
+      loadText(item.texto);
+    },
+    [leiSecaEixo, loadText],
+  );
+
   const reset = useCallback(
     (
       m: FullMode,
@@ -432,7 +462,12 @@ function Index() {
         void nextStudy(q, keys, opts?.area ?? effectiveArea, activeLines);
         return;
       }
+      if (m === "leiseca") {
+        nextLeiSeca();
+        return;
+      }
       setCurrentStudy(null);
+      setCurrentLeiSeca(null);
       if (m === "automatico") {
         const r = adaptiveRoute(keys, stats);
         setRoute(r);
@@ -452,7 +487,7 @@ function Index() {
         );
       }
     },
-    [effectiveArea, enrichText, lineCount, loadText, nextStudy, studyQueue],
+    [effectiveArea, enrichText, lineCount, loadText, nextStudy, studyQueue, nextLeiSeca],
   );
 
   useEffect(() => {
@@ -766,7 +801,11 @@ function Index() {
   const goNext = () =>
     repeat && eng.current.text
       ? loadText(eng.current.text)
-      : reset(mode, selectedKeys, keyStats, level);
+      : mode === "estudos"
+        ? void nextStudy(studyQueue, selectedKeys, effectiveArea)
+        : mode === "leiseca"
+          ? nextLeiSeca()
+          : reset(mode, selectedKeys, keyStats, level);
   goNextRef.current = goNext;
 
   const e = eng.current;
@@ -813,17 +852,6 @@ function Index() {
                 )}
               >
                 ⌨️ Treino
-              </button>
-              <button
-                onClick={() => setActiveTab("leiseca")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-semibold transition-colors",
-                  activeTab === "leiseca"
-                    ? "bg-gold text-gold-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                📜 Lei Seca
               </button>
               <button
                 onClick={() => setActiveTab("desempenho")}
@@ -1018,36 +1046,44 @@ function Index() {
                       : "Modo Fluido (corrige com Backspace)"
                   }
                 />
-                <div className="flex flex-col gap-1.5 mt-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-3 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">
+                      Sons das Teclas:
+                    </span>
                     <button
                       onClick={toggleMute}
-                      className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-secondary"
+                      className={cn(
+                        "rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors",
+                        muted
+                          ? "border-destructive/40 bg-destructive/10 text-destructive"
+                          : "border-gold/40 bg-gold/15 text-gold",
+                      )}
                     >
-                      {muted ? "🔇 Mudo" : "🔊 Som"}
+                      {muted ? "🔇 Silencioso" : "🔊 Ativado"}
                     </button>
-                    <select
-                      value={soundProfile}
-                      onChange={(ev) => {
-                        const p = ev.target.value as SoundProfile;
-                        setSoundProfile(p);
-                        setSoundProfileState(p);
-                        playKey();
-                      }}
-                      disabled={muted}
-                      className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium disabled:opacity-40"
-                      title="Perfil sonoro das teclas"
-                    >
-                      {SOUND_PROFILES.map((prof) => (
-                        <option key={prof.id} value={prof.id}>
-                          {prof.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
-                  <span className="text-[0.65rem] text-muted-foreground">
+                  <select
+                    value={soundProfile}
+                    onChange={(ev) => {
+                      const p = ev.target.value as SoundProfile;
+                      setSoundProfile(p);
+                      setSoundProfileState(p);
+                      playKey();
+                    }}
+                    disabled={muted}
+                    className="w-full rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40 shadow-sm"
+                    title="Perfil sonoro das teclas"
+                  >
+                    {SOUND_PROFILES.map((prof) => (
+                      <option key={prof.id} value={prof.id}>
+                        {prof.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[0.7rem] text-muted-foreground leading-snug">
                     {SOUND_PROFILES.find((p) => p.id === soundProfile)?.description}
-                  </span>
+                  </p>
                 </div>
               </div>
 
@@ -1334,6 +1370,60 @@ function Index() {
           </div>
         )}
 
+        {/* Info do modo Lei Seca */}
+        {mode === "leiseca" && (
+          <div className="space-y-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <label htmlFor="eixo-leiseca" className="font-medium text-foreground">
+                  Eixo da Lei Seca:
+                </label>
+                <select
+                  id="eixo-leiseca"
+                  value={leiSecaEixo}
+                  onChange={(ev) => {
+                    const nx = ev.target.value;
+                    setLeiSecaEixo(nx);
+                    nextLeiSeca(nx);
+                  }}
+                  className="rounded-md border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm"
+                >
+                  {LEI_SECA_EIXOS.map((e) => (
+                    <option key={e} value={e}>
+                      {e}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => nextLeiSeca()}
+                  className="rounded-md bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm"
+                >
+                  Próximo Artigo →
+                </button>
+              </div>
+            </div>
+
+            {currentLeiSeca && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gold/20 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-gold">
+                    📜 {currentLeiSeca.diploma}:
+                  </span>
+                  <span className="rounded bg-gold/15 px-2 py-0.5 font-bold text-foreground">
+                    {currentLeiSeca.dispositivo}
+                  </span>
+                </div>
+                <span className="text-muted-foreground hidden sm:inline font-mono-type">
+                  {currentLeiSeca.fonteOficial}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Barra de Status e Restauração dos Painéis Independentes */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
@@ -1497,11 +1587,6 @@ function Index() {
                             <p className="text-foreground leading-relaxed">
                               <strong>Significado Técnico:</strong> {complexTerm.significado}
                             </p>
-                            {complexTerm.virada && (
-                              <p className="text-muted-foreground mt-1.5 border-t border-gold/15 pt-1.5">
-                                <span className="text-gold font-semibold">💡 Impacto Prático / Pegadinha FGV:</span> {complexTerm.virada}
-                              </p>
-                            )}
                           </div>
                         )}
 
@@ -1574,7 +1659,7 @@ function Index() {
                   onMoveUp={() => moveBox("lesson", "up")}
                   onMoveDown={() => moveBox("lesson", "down")}
                 >
-                  {activeLesson ? (
+                  {result && activeLesson ? (
                     <LessonCard
                       item={activeLesson}
                       onClose={() => {
@@ -1587,21 +1672,48 @@ function Index() {
                         localStorage.setItem("lextype-font-study", f);
                       }}
                     />
+                  ) : activeLesson ? (
+                    <div className="rounded-lg border border-gold/30 bg-gold/5 p-6 text-center space-y-2">
+                      <div className="text-3xl">🔒</div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-gold">
+                        Virada de Chave Protegida
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {mode === "leiseca" && currentLeiSeca
+                          ? `${currentLeiSeca.dispositivo} (${currentLeiSeca.diploma})`
+                          : activeLesson.virada.titulo}
+                      </p>
+                      <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                        {mode === "leiseca"
+                          ? "Foque na digitação do dispositivo legal acima. O conceito doutrinário, a tese vinculante e o caso concreto serão revelados ao final!"
+                          : "Foque na cadência e na precisão dos dedos. A Virada de Chave (critério decisivo, requisitos e caso prático) será revelada assim que você concluir a digitação!"}
+                      </p>
+                    </div>
                   ) : (
                     <div className="rounded-lg border border-dashed border-border/70 p-6 text-center text-muted-foreground">
                       <p className="text-sm font-medium mb-1">🎓 Nenhuma virada de chave carregada no momento.</p>
                       <p className="text-xs mb-3 text-muted-foreground/80">
-                        No modo <strong>Estudos Jurídicos</strong> ou <strong>Lei Seca</strong>, este painel exibirá o conceito estruturado, critério decisivo e o caso prático correspondente.
+                        No modo <strong>Estudos Jurídicos</strong> ou <strong>Lei Seca</strong>, este painel exibirá o conceito estruturado, critério decisivo e o caso prático correspondente ao final de cada item.
                       </p>
-                      <button
-                        onClick={() => {
-                          changeMode("estudos");
-                          void nextStudy([], selectedKeys, effectiveArea);
-                        }}
-                        className="rounded-md bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90"
-                      >
-                        Iniciar Aula de {effectiveArea}
-                      </button>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <button
+                          onClick={() => {
+                            changeMode("estudos");
+                            void nextStudy([], selectedKeys, effectiveArea);
+                          }}
+                          className="rounded-md bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90"
+                        >
+                          Iniciar Estudos Jurídicos
+                        </button>
+                        <button
+                          onClick={() => {
+                            changeMode("leiseca");
+                          }}
+                          className="rounded-md border border-gold text-gold hover:bg-gold/10 px-3.5 py-1.5 text-xs font-semibold"
+                        >
+                          Treinar Lei Seca
+                        </button>
+                      </div>
                     </div>
                   )}
                 </MovableCard>
@@ -1894,6 +2006,54 @@ function ResultView({
           <span className="font-semibold text-gold">Parecer técnico do professor: </span>
           {coachingTip(weak)}
         </p>
+      )}
+      {result.study && (
+        <div className="mx-auto max-w-2xl text-left rounded-xl border border-gold/40 bg-card p-5 space-y-3.5 shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-gold/20 px-2.5 py-0.5 text-xs font-bold text-gold uppercase tracking-wider">
+                💡 Virada de Chave Desbloqueada
+              </span>
+              <span className="font-mono-type text-xs text-foreground font-semibold">
+                {result.study.virada.titulo}
+              </span>
+            </div>
+            <span className="text-[11px] text-muted-foreground font-mono-type">
+              {result.study.semantica}
+            </span>
+          </div>
+
+          {result.study.virada.conceito && (
+            <div className="rounded-lg bg-secondary/30 p-3.5 border border-border/50">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-gold mb-1">
+                📖 Dispositivo & Conceito
+              </div>
+              <p className="text-xs sm:text-sm text-foreground leading-relaxed">
+                {result.study.virada.conceito}
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-lg bg-gold/10 p-3.5 border border-gold/30">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-gold mb-1">
+              💡 Virada de Chave (Atualidade / Tese Vinculante / Critério Decisivo)
+            </div>
+            <p className="text-xs sm:text-sm font-semibold text-foreground leading-relaxed">
+              {result.study.virada.raciocinio}
+            </p>
+          </div>
+
+          {result.study.virada.exemplo && (
+            <div className="rounded-lg bg-secondary/30 p-3.5 border border-border/50">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                ⚖️ Exemplo / Caso Concreto no Exame
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                {result.study.virada.exemplo}
+              </p>
+            </div>
+          )}
+        </div>
       )}
       {weak.length > 0 && (
         <p className="text-sm text-muted-foreground">

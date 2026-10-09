@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { LEI_SECA_BANK, filterLeiSeca, checkAndSyncOfficialLegislation } from "@/lib/lei-seca";
+import {
+  LEI_SECA_BANK,
+  filterLeiSeca,
+  checkAndSyncOfficialLegislation,
+  leiSecaToStudyItem,
+  getNextLeiSecaItem,
+} from "@/lib/lei-seca";
 import {
   extractComplexLegalTerm,
   calculateFgvRecurrence,
@@ -90,5 +96,23 @@ As provas obtidas por meios ilícitos são inadmissíveis no processo judicial.`
     expect(SOUND_PROFILES.some((p) => p.name.includes("Blue"))).toBe(true);
     expect(SOUND_PROFILES.some((p) => p.name.includes("Brown"))).toBe(true);
     expect(SOUND_PROFILES.some((p) => p.name.includes("Red") || p.name.includes("Linear"))).toBe(true);
+  });
+
+  it("deve converter LeiSecaItem em StudyItem com Virada de Chave tripartite e atualidades", () => {
+    const item = LEI_SECA_BANK[0]!;
+    const study = leiSecaToStudyItem(item);
+    expect(study.linha).toBe(item.texto);
+    expect(study.virada.titulo).toContain(item.dispositivo);
+    expect(study.virada.conceito).toBe(item.explicacao);
+    expect(study.virada.raciocinio.length).toBeGreaterThan(10);
+    expect(study.virada.exemplo.length).toBeGreaterThan(10);
+  });
+
+  it("deve buscar o próximo artigo na base de dados de forma sequencial e respeitando o eixo", () => {
+    const item1 = getNextLeiSecaItem("Direito Constitucional", []);
+    expect(item1.eixo).toBe("Direito Constitucional");
+    const item2 = getNextLeiSecaItem("Direito Constitucional", [item1.id]);
+    expect(item2.id).not.toBe(item1.id);
+    expect(item2.eixo).toBe("Direito Constitucional");
   });
 });

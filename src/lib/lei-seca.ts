@@ -1,3 +1,5 @@
+import type { StudyItem } from "@/lib/study.functions";
+
 // Banco de Legislação Oficial "Lei Seca" & Sincronizador Governamental (Planalto / STF / STJ)
 // Contém artigos, incisos, parágrafos e súmulas vinculantes organizados por eixos temáticos da OAB.
 
@@ -12,6 +14,8 @@ export interface LeiSecaItem {
   palavrasComplexas: { termo: string; semantica: string }[];
   fonteOficial: string;
   artigoNum?: number;
+  atualidade?: string;
+  casoConcreto?: string;
 }
 
 export const LEI_SECA_EIXOS = [
@@ -545,4 +549,33 @@ export async function checkAndSyncOfficialLegislation(): Promise<{
       message: "Verificação realizada localmente: todos os diplomas vigentes estão carregados e disponíveis offline.",
     };
   }
+}
+
+export function leiSecaToStudyItem(item: LeiSecaItem): StudyItem {
+  const atualidade =
+    item.atualidade ||
+    `Tese Vinculante / Atualidade: ${item.explicacao} (Precedente consolidado perante a jurisprudência da FGV/Tribunais Superiores).`;
+  const caso =
+    item.casoConcreto ||
+    `Em situação concreta, o descumprimento do ${item.dispositivo} do ${item.diploma} enseja nulidade processual ou reparação civil/administrativa em favor do titular lesado.`;
+
+  return {
+    linha: item.texto,
+    termo: `${item.dispositivo} (${item.diploma})`,
+    semantica: `${item.dispositivo} • ${item.fonteOficial}`,
+    virada: {
+      titulo: `${item.dispositivo} — ${item.diploma}`,
+      conceito: item.explicacao,
+      raciocinio: atualidade,
+      exemplo: caso,
+    },
+  };
+}
+
+export function getNextLeiSecaItem(eixo?: string, seen: string[] = []): LeiSecaItem {
+  const filtered = filterLeiSeca(eixo);
+  const pool = filtered.length > 0 ? filtered : getStoredLeiSeca();
+  const unseen = pool.filter((item) => !seen.includes(item.id));
+  const candidate = unseen.length > 0 ? unseen[0]! : pool[0]!;
+  return candidate;
 }
