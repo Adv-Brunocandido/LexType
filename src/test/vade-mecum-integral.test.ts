@@ -67,7 +67,7 @@ describe("Base Integral do Vade Mecum Digital & Jurisprudência (Edição 2026)"
   });
 
   it("converte item de Lei Seca para StudyItem com virada de chave e aplicação prática", () => {
-    const item = LEI_SECA_BANK[0];
+    const item = LEI_SECA_BANK[0]!;
     const studyItem = leiSecaToStudyItem(item);
     expect(studyItem.termo).toBeTruthy();
     expect(studyItem.linha).toBe(item.texto);

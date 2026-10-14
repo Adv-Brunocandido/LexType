@@ -37,8 +37,11 @@ export const newEngine = (text: string): Engine => ({
   marks: [],
 });
 
+export type TypingErrorMode = "fluid" | "strict" | "restart" | "nobackspace";
+
 export interface TypeOptions {
-  stopOnError: boolean;
+  stopOnError?: boolean;
+  errorMode?: TypingErrorMode;
   caseSensitive?: boolean;
   layout?: KeyboardLayout;
   now?: number;
@@ -47,7 +50,7 @@ export interface TypeOptions {
 export type TypeOutcome =
   | { kind: "ignored"; started: false }
   | { kind: "correct"; started: boolean; keys: string[]; finished: boolean }
-  | { kind: "wrong"; started: boolean; keys: string[]; expected: string };
+  | { kind: "wrong"; started: boolean; keys: string[]; expected: string; restarted?: boolean };
 
 const MAX_HESITATION_MS = 3000;
 
@@ -108,9 +111,16 @@ export function typeChar(e: Engine, ch: string, o: TypeOptions): TypeOutcome {
   for (const k of keys) e.errorMap[k] = (e.errorMap[k] ?? 0) + 1;
   e.combo = 0;
   e.errStreak++;
-  if (o.stopOnError) {
+
+  const mode: TypingErrorMode = o.errorMode ?? (o.stopOnError ? "strict" : "fluid");
+
+  if (mode === "restart") {
+    restartLine(e);
+    return { kind: "wrong", started, keys, expected, restarted: true };
+  } else if (mode === "strict") {
     e.wrongAt = e.pos;
   } else {
+    // "fluid" ou "nobackspace"
     e.marks[e.pos] = true;
     e.pos++;
     e.lastAt = now;
@@ -120,8 +130,15 @@ export function typeChar(e: Engine, ch: string, o: TypeOptions): TypeOutcome {
 }
 
 /** Volta um caractere. Só tem efeito no modo fluido. */
-export function backspace(e: Engine, stopOnError: boolean): boolean {
-  if (stopOnError || e.pos === 0) return false;
+export function backspace(e: Engine, errorModeOrStopOnError: boolean | TypingErrorMode): boolean {
+  const isBlocked =
+    typeof errorModeOrStopOnError === "boolean"
+      ? errorModeOrStopOnError
+      : errorModeOrStopOnError === "strict" ||
+        errorModeOrStopOnError === "restart" ||
+        errorModeOrStopOnError === "nobackspace";
+
+  if (isBlocked || e.pos === 0) return false;
   e.pos--;
   e.marks[e.pos] = false;
   e.wrongAt = e.marks.lastIndexOf(true) >= 0 ? e.marks.lastIndexOf(true) : null;

@@ -7,7 +7,7 @@ export interface StudyItem {
   semantica: string;
   virada: {
     titulo: string;
-    conceito?: string;
+    conceito?: string | undefined;
     raciocinio: string;
     exemplo: string;
   };

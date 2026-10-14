@@ -58,7 +58,10 @@ export function AnalyticsDashboard({
     const avgAccuracy = Math.round(totalAcc / sessions.length);
 
     // Estimativa de caracteres e palavras digitadas
-    const totalChars = sessions.reduce((acc, s) => acc + (s.wpm ? Math.round(s.wpm * 5 * 0.75) : 80), 0);
+    const totalChars = sessions.reduce(
+      (acc, s) => acc + (s.wpm ? Math.round(s.wpm * 5 * 0.75) : 80),
+      0,
+    );
     const totalWords = Math.round(totalChars / 5);
     const totalMinutes = Math.max(
       Math.round(practiceTodaySeconds / 60),
@@ -168,8 +171,12 @@ export function AnalyticsDashboard({
       return { x, yWpm, yAcc, wpm: s.wpm, acc: s.accuracy, date: s.date };
     });
 
-    const pathWpm = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.yWpm.toFixed(1)}`).join(" ");
-    const pathAcc = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.yAcc.toFixed(1)}`).join(" ");
+    const pathWpm = points
+      .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.yWpm.toFixed(1)}`)
+      .join(" ");
+    const pathAcc = points
+      .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.yAcc.toFixed(1)}`)
+      .join(" ");
 
     return { points, pathWpm, pathAcc, width, height, maxWpm, minWpm };
   }, [sessions]);
@@ -418,7 +425,11 @@ export function AnalyticsDashboard({
                 <text x="12" y="42" className="fill-primary text-[10px] font-mono">
                   {chartData.maxWpm} ppm
                 </text>
-                <text x="12" y={chartData.height - 36} className="fill-muted-foreground text-[10px] font-mono">
+                <text
+                  x="12"
+                  y={chartData.height - 36}
+                  className="fill-muted-foreground text-[10px] font-mono"
+                >
                   {chartData.minWpm} ppm
                 </text>
 
@@ -491,8 +502,12 @@ export function AnalyticsDashboard({
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
             <span className="text-3xl">📈</span>
-            <p className="mt-2 text-sm font-medium">Dados de sessões insuficientes para traçar gráfico.</p>
-            <p className="text-xs">Complete pelo menos 2 sessões para visualizar sua curva de evolução.</p>
+            <p className="mt-2 text-sm font-medium">
+              Dados de sessões insuficientes para traçar gráfico.
+            </p>
+            <p className="text-xs">
+              Complete pelo menos 2 sessões para visualizar sua curva de evolução.
+            </p>
           </div>
         )}
       </section>
@@ -507,8 +522,12 @@ export function AnalyticsDashboard({
                 ✓
               </span>
               <div>
-                <h4 className="font-bold text-foreground">Teclas Dominadas ({keyAnalysis.mastered.length})</h4>
-                <p className="text-xs text-muted-foreground">Precisão superior a 95% e alta consistência muscular</p>
+                <h4 className="font-bold text-foreground">
+                  Teclas Dominadas ({keyAnalysis.mastered.length})
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Precisão superior a 95% e alta consistência muscular
+                </p>
               </div>
             </div>
             <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-500">
@@ -544,15 +563,19 @@ export function AnalyticsDashboard({
                 ⚠
               </span>
               <div>
-                <h4 className="font-bold text-foreground">Teclas em Atenção ({keyAnalysis.critical.length})</h4>
-                <p className="text-xs text-muted-foreground">Teclas com maior incidência de erro ou hesitação</p>
+                <h4 className="font-bold text-foreground">
+                  Teclas em Atenção ({keyAnalysis.critical.length})
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Teclas com maior incidência de erro ou hesitação
+                </p>
               </div>
             </div>
             {keyAnalysis.topWeak.length > 0 && (
               <button
                 onClick={() => {
-                  onTrainWeakKeys(keyAnalysis.topWeak);
-                  onSwitchToPractice();
+                  onTrainWeakKeys?.(keyAnalysis.topWeak);
+                  handleReturnToPractice();
                 }}
                 className="rounded-lg bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-400 transition hover:bg-amber-500/30"
               >
@@ -585,7 +608,8 @@ export function AnalyticsDashboard({
       {/* 5. Ações e Exportação de Dados */}
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/20 p-4">
         <div className="text-xs text-muted-foreground">
-          Todos os dados e métricas são armazenados <strong>100% localmente no seu navegador</strong> (privacidade absoluta, sem telemetria).
+          Todos os dados e métricas são armazenados{" "}
+          <strong>100% localmente no seu navegador</strong> (privacidade absoluta, sem telemetria).
         </div>
 
         <div className="flex items-center gap-3">

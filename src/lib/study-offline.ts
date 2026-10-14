@@ -26819,11 +26819,10 @@ export function offlineStudy(
 
   const targetArea = normalizeArea(area);
   const matches = BANK.filter((b) => b.area.toLowerCase() === targetArea);
-  const basePool = matches.length
-    ? [...matches, ...BANK.filter((b) => b.area.toLowerCase() !== targetArea)]
-    : [...BANK];
+  // Quando há correspondência para a matéria, usa ESTRITAMENTE os itens da matéria escolhida
+  const basePool = matches.length > 0 ? [...matches] : [...BANK];
 
-  // Ordena decrescente pelo índice de relevância e repetição histórica da FGV
+  // Ordena decrescente pelo índice de relevância e repetição histórica da FGV daquela matéria
   basePool.sort((a, b) => {
     const scoreA = calculateFgvRecurrence(a).score;
     const scoreB = calculateFgvRecurrence(b).score;
@@ -26846,8 +26845,8 @@ export function offlineStudy(
       virada: {
         ...b.virada,
         conceito: complex
-          ? `${b.virada.conceito}\n\n[Semântica Chave: "${complex.termo}"]: ${complex.semantica}`
-          : b.virada.conceito,
+          ? `${b.virada.conceito || ""}\n\n[Semântica Chave: "${complex.termo}"]: ${complex.semantica}`
+          : (b.virada.conceito || ""),
       },
     };
   });

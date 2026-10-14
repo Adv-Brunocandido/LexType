@@ -20,7 +20,9 @@ import { offlineStudy, extractComplexLegalTerm } from "@/lib/study-offline";
 import { LeiSecaPanel } from "@/components/LeiSecaPanel";
 import { DicionarioPanel } from "@/components/DicionarioPanel";
 import { RankingRecordsPanel } from "@/components/RankingRecordsPanel";
+import { ProfileModal } from "@/components/ProfileModal";
 import { MovableCard } from "@/components/MovableCard";
+import { getActiveProfile, updateActiveProfile, type UserProfile } from "@/lib/profiles";
 import {
   type LeiSecaItem,
   LEI_SECA_EIXOS,
@@ -56,6 +58,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   type Engine,
+  type TypingErrorMode,
   newEngine,
   typeChar,
   backspace,
@@ -138,11 +141,18 @@ const CUSTOM = "__custom__";
 
 interface Prefs {
   stopOnError: boolean;
+  errorMode: TypingErrorMode;
   caps: boolean;
   punct: boolean;
   symbols: boolean;
 }
-const DEFAULT_PREFS: Prefs = { stopOnError: true, caps: false, punct: false, symbols: false };
+const DEFAULT_PREFS: Prefs = {
+  stopOnError: true,
+  errorMode: "strict",
+  caps: false,
+  punct: false,
+  symbols: false,
+};
 const DAILY_SECONDS = 300;
 const todayKey = () => `lextype-practice-${new Date().toISOString().slice(0, 10)}`;
 
@@ -290,11 +300,25 @@ function Index() {
     return (localStorage.getItem("lextype-scale") as KeyboardScale) || "normal";
   });
 
+  const [activeProfile, setActiveProfile] = useState<UserProfile>(() => getActiveProfile());
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   const [prefs, setPrefs] = useState<Prefs>(() => {
     if (typeof localStorage === "undefined") return DEFAULT_PREFS;
     try {
       const p = localStorage.getItem("lextype-prefs");
-      return p ? { ...DEFAULT_PREFS, ...JSON.parse(p) } : DEFAULT_PREFS;
+      if (p) {
+        const parsed = JSON.parse(p);
+        const errorMode: TypingErrorMode =
+          parsed.errorMode || (parsed.stopOnError === false ? "fluid" : "strict");
+        return {
+          ...DEFAULT_PREFS,
+          ...parsed,
+          errorMode,
+          stopOnError: errorMode === "strict",
+        };
+      }
+      return DEFAULT_PREFS;
     } catch {
       return DEFAULT_PREFS;
     }
@@ -403,21 +427,24 @@ function Index() {
     return parts;
   }, []);
 
-  const loadText = useCallback((text: string, targetPartIdx = 0) => {
-    const parts = splitTextIntoTypingParts(text);
-    const pIdx = Math.min(Math.max(0, targetPartIdx), Math.max(0, parts.length - 1));
-    setTypingParts(parts);
-    setPartIndex(pIdx);
-    const activeText = parts[pIdx] || text;
-    eng.current = newEngine(activeText);
-    consumed.current = 0;
-    if (inputRef.current) inputRef.current.value = "";
-    setElapsed(0);
-    setRunning(false);
-    setResult(null);
-    setFlash(null);
-    rerender();
-  }, [splitTextIntoTypingParts]);
+  const loadText = useCallback(
+    (text: string, targetPartIdx = 0) => {
+      const parts = splitTextIntoTypingParts(text);
+      const pIdx = Math.min(Math.max(0, targetPartIdx), Math.max(0, parts.length - 1));
+      setTypingParts(parts);
+      setPartIndex(pIdx);
+      const activeText = parts[pIdx] || text;
+      eng.current = newEngine(activeText);
+      consumed.current = 0;
+      if (inputRef.current) inputRef.current.value = "";
+      setElapsed(0);
+      setRunning(false);
+      setResult(null);
+      setFlash(null);
+      rerender();
+    },
+    [splitTextIntoTypingParts],
+  );
 
   const enrichText = useCallback((text: string, p: Prefs) => {
     const modifiers: TextModifiers = {
@@ -577,7 +604,13 @@ function Index() {
         setRoute(r);
         loadText(
           enrichText(
-            generateText({ mode: "palavras", keys: r.target, weak: r.weak, level: lvl, lines: activeLines }),
+            generateText({
+              mode: "palavras",
+              keys: r.target,
+              weak: r.weak,
+              level: lvl,
+              lines: activeLines,
+            }),
             prefsRef.current,
           ),
         );
@@ -585,7 +618,13 @@ function Index() {
         setRoute(null);
         loadText(
           enrichText(
-            generateText({ mode: m, keys, weak: weakestKeys(stats, keys), level: lvl, lines: activeLines }),
+            generateText({
+              mode: m,
+              keys,
+              weak: weakestKeys(stats, keys),
+              level: lvl,
+              lines: activeLines,
+            }),
             prefsRef.current,
           ),
         );
@@ -651,13 +690,14 @@ function Index() {
     setKeyStats(stats);
 
     let levelChange = 0;
+    let newLevel = level;
     if (mode === "automatico") {
       if (accuracy >= 96 && wpm >= 12 + level * 3) levelChange = 1;
       else if (accuracy < 88) levelChange = -1;
-      const nl = Math.min(10, Math.max(1, level + levelChange));
-      if (nl === level) levelChange = 0;
-      setLevel(nl);
-      saveNum("lextype-level", nl);
+      newLevel = Math.min(10, Math.max(1, level + levelChange));
+      if (newLevel === level) levelChange = 0;
+      setLevel(newLevel);
+      saveNum("lextype-level", newLevel);
     }
 
     const secs = Math.round(minutes * 60);
@@ -679,6 +719,18 @@ function Index() {
     setToday(sessionsToday());
     setBestWpm((b) => Math.max(b, wpm));
 
+    // Mantém o perfil do usuário ativo sincronizado
+    const updatedProf = updateActiveProfile({
+      xp: newXp,
+      level: newLevel,
+      bestWpm: Math.max(bestWpm, wpm),
+      streak: streakDays(),
+      practiceTodaySeconds: practiced,
+      sessions: loadSessions(),
+      keyStats: stats,
+    });
+    setActiveProfile(updatedProf);
+
     if (currentStudy) setPinned(currentStudy);
     setResult({
       wpm,
@@ -694,14 +746,15 @@ function Index() {
     if (levelChange > 0) say("levelUp");
     else if (levelChange < 0) say("levelDown");
     else say(accuracy >= 96 ? "finishGreat" : accuracy >= 90 ? "finishOk" : "finishBad");
-  }, [currentStudy, level, mode, say, xp]);
+  }, [bestWpm, currentStudy, level, mode, say, xp]);
 
   const processChar = useCallback(
     (ch: string) => {
       const e = eng.current;
       if (result || !e.text || e.pos >= e.text.length) return;
       const outcome = typeChar(e, ch, {
-        stopOnError: prefsRef.current.stopOnError,
+        stopOnError: prefsRef.current.errorMode === "strict",
+        errorMode: prefsRef.current.errorMode,
         caseSensitive: prefsRef.current.caps,
         layout: keyboardLayout,
         now: Date.now(),
@@ -744,8 +797,17 @@ function Index() {
         flashTimerRef.current = setTimeout(() => {
           setFlash(null);
         }, 350);
-        if (e.errStreak === 3) say("errorStreak");
-        else if (e.errStreak === 1 && Math.random() < 0.45) say("error", { k: outcome.expected });
+
+        if (outcome.restarted) {
+          consumed.current = 0;
+          if (inputRef.current) inputRef.current.value = "";
+          setElapsed(0);
+          setRunning(false);
+          say("errorStreak");
+        } else {
+          if (e.errStreak === 3) say("errorStreak");
+          else if (e.errStreak === 1 && Math.random() < 0.45) say("error", { k: outcome.expected });
+        }
       }
       rerender();
     },
@@ -755,7 +817,9 @@ function Index() {
   const handleBackspace = () => {
     const e = eng.current;
     if (result) return;
-    const ok = backspace(e, prefsRef.current.stopOnError);
+    const curMode = prefsRef.current.errorMode;
+    if (curMode === "nobackspace" || curMode === "strict" || curMode === "restart") return;
+    const ok = backspace(e, curMode);
     if (ok) {
       playKey();
       rerender();
@@ -823,7 +887,12 @@ function Index() {
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       const t = ev.target as HTMLElement;
-      if (t.tagName === "SELECT" || t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && t !== inputRef.current)) return;
+      if (
+        t.tagName === "SELECT" ||
+        t.tagName === "TEXTAREA" ||
+        (t.tagName === "INPUT" && t !== inputRef.current)
+      )
+        return;
       if (ev.key === "Enter" && result) {
         ev.preventDefault();
         goNextRef.current();
@@ -859,7 +928,13 @@ function Index() {
   };
 
   const updatePrefs = (patch: Partial<Prefs>) => {
-    const next = { ...prefsRef.current, ...patch };
+    const nextPatch = { ...patch };
+    if ("errorMode" in patch && patch.errorMode) {
+      nextPatch.stopOnError = patch.errorMode === "strict";
+    } else if ("stopOnError" in patch && patch.stopOnError !== undefined) {
+      nextPatch.errorMode = patch.stopOnError ? "strict" : "fluid";
+    }
+    const next = { ...prefsRef.current, ...nextPatch };
     setPrefs(next);
     prefsRef.current = next;
     localStorage.setItem("lextype-prefs", JSON.stringify(next));
@@ -875,7 +950,10 @@ function Index() {
       return;
     }
     const raw = (await file.text()).slice(0, 50000);
-    const cleaned = raw.replace(/[\u00A0\u200B]/g, " ").replace(/\r\n/g, "\n").trim();
+    const cleaned = raw
+      .replace(/[\u00A0\u200B]/g, " ")
+      .replace(/\r\n/g, "\n")
+      .trim();
     const extracted = cleaned
       .split(/(?<=[.?!;\n])\s+/)
       .map((s) => s.replace(/\s+/g, " ").trim())
@@ -916,6 +994,13 @@ function Index() {
   const changeMode = (m: FullMode) => {
     setMode(m);
     reset(m, selectedKeys, keyStats, level, { freshStudy: true });
+  };
+  const handleAreaChange = (newArea: string) => {
+    setArea(newArea);
+    setStudyQueue([]);
+    seenTerms.current = [];
+    const eff = newArea === CUSTOM ? customArea.trim() || "Direito em geral" : newArea;
+    reset("estudos", selectedKeys, keyStats, level, { area: eff, freshStudy: true });
   };
   const toggleMute = () => {
     const m = !muted;
@@ -1089,6 +1174,26 @@ function Index() {
             <Stat value={`${streak}🔥`} label="dias" gold />
             <Stat value={bestWpm} label="melhor PPM" />
             <button
+              onClick={() => setShowProfileModal(true)}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:border-gold hover:bg-gold/10 transition-colors shadow-sm"
+              title="Gerenciar / Alternar Perfis de Usuário"
+            >
+              <span className="text-sm">{activeProfile.avatar}</span>
+              <span className="max-w-[100px] truncate font-semibold text-foreground">
+                {activeProfile.name}
+              </span>
+              {activeProfile.pin && (
+                <span className="text-[10px]" title="Protegido por PIN">
+                  🔒
+                </span>
+              )}
+              {activeProfile.isGoogle && (
+                <span className="text-[10px]" title="Google Login">
+                  🌐
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setShowSettings((v) => !v)}
               className={cn(
                 "rounded-md border px-2.5 py-1 text-sm font-medium transition-colors",
@@ -1206,25 +1311,40 @@ function Index() {
                 </div>
               </div>
 
-              {/* Comportamento do Cursor */}
+              {/* Modos de Digitação e Erro */}
               <div className="space-y-2">
                 <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
-                  Controle de Erros
+                  Modo de Erro & Rigor
                 </span>
-                <Toggle
-                  on={prefs.stopOnError}
-                  onChange={(v) => updatePrefs({ stopOnError: v })}
-                  label={
-                    prefs.stopOnError
-                      ? "Modo Estrito (cursor trava no erro)"
-                      : "Modo Fluido (corrige com Backspace)"
-                  }
-                />
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(
+                    [
+                      { id: "fluid", label: "🌊 Fluido", desc: "Backspace livre" },
+                      { id: "strict", label: "🛑 Estrito", desc: "Para no erro" },
+                      { id: "restart", label: "⚡ Morte Súbita", desc: "Errou, reinicia" },
+                      { id: "nobackspace", label: "🥋 Modo Mestre", desc: "Sem Backspace" },
+                    ] as const
+                  ).map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => updatePrefs({ errorMode: m.id })}
+                      className={cn(
+                        "flex flex-col items-start rounded-md border p-2 text-left transition-colors",
+                        prefs.errorMode === m.id
+                          ? "border-gold bg-gold/15 text-gold font-bold shadow-sm"
+                          : "border-border bg-background text-muted-foreground hover:bg-secondary",
+                      )}
+                    >
+                      <span className="text-xs">{m.label}</span>
+                      <span className="text-[10px] text-muted-foreground font-normal leading-tight">
+                        {m.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
                 <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-3 mt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">
-                      Sons das Teclas:
-                    </span>
+                    <span className="text-xs font-semibold text-foreground">Sons das Teclas:</span>
                     <button
                       onClick={toggleMute}
                       className={cn(
@@ -1347,7 +1467,8 @@ function Index() {
                 )}
               </div>
               <p className="text-[0.7rem] text-muted-foreground">
-                Se você não informar uma chave de IA ou estiver sem rede, o LexType funciona 100% autônomo com as 2.220 viradas de chave e questões da OAB incorporadas no app.
+                Se você não informar uma chave de IA ou estiver sem rede, o LexType funciona 100%
+                autônomo com as 2.220 viradas de chave e questões da OAB incorporadas no app.
               </p>
             </div>
           </div>
@@ -1405,753 +1526,832 @@ function Index() {
         </main>
       ) : (
         <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
-        {/* Modos */}
-        <div
-          className={cn(
-            "flex flex-wrap gap-2.5 sm:gap-3 transition-opacity duration-500",
-            inFlow && "opacity-25 hover:opacity-100",
-          )}
-        >
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => changeMode(m.id)}
-              title={m.hint}
+          {/* Modos */}
+          <div
+            className={cn(
+              "flex flex-wrap gap-2.5 sm:gap-3 transition-opacity duration-500",
+              inFlow && "opacity-25 hover:opacity-100",
+            )}
+          >
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => changeMode(m.id)}
+                title={m.hint}
+                className={cn(
+                  "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                  mode === m.id
+                    ? "border-gold bg-gold text-gold-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Professor */}
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-gold bg-card text-2xl shadow-sm"
+              title="Prof. Dr. Rigoroso"
+            >
+              👨‍⚖️
+            </div>
+            <div
+              key={quote.id}
               className={cn(
-                "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
-                mode === m.id
-                  ? "border-gold bg-gold text-gold-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground",
+                "animate-pop-in relative rounded-xl rounded-tl-none border px-4 py-2.5 text-sm transition-all",
+                ["error", "errorStreak", "finishBad", "levelDown"].includes(quote.mood)
+                  ? "border-destructive/50 bg-destructive/10"
+                  : ["combo", "finishGreat", "levelUp"].includes(quote.mood)
+                    ? "border-success/50 bg-success/10"
+                    : "border-border bg-card",
               )}
             >
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Professor */}
-        <div className="flex items-start gap-3">
-          <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-gold bg-card text-2xl shadow-sm"
-            title="Prof. Dr. Rigoroso"
-          >
-            👨‍⚖️
-          </div>
-          <div
-            key={quote.id}
-            className={cn(
-              "animate-pop-in relative rounded-xl rounded-tl-none border px-4 py-2.5 text-sm transition-all",
-              ["error", "errorStreak", "finishBad", "levelDown"].includes(quote.mood)
-                ? "border-destructive/50 bg-destructive/10"
-                : ["combo", "finishGreat", "levelUp"].includes(quote.mood)
-                  ? "border-success/50 bg-success/10"
-                  : "border-border bg-card",
-            )}
-          >
-            <div className="text-[0.65rem] font-semibold uppercase tracking-wider text-gold">
-              Prof. Dr. Rigoroso
-            </div>
-            {quote.text || "…"}
-          </div>
-        </div>
-
-        {/* Info do modo */}
-        {mode === "automatico" && route && (
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
-            <span>
-              Nível <span className="font-mono-type font-bold text-gold">{level}/10</span>
-            </span>
-            <span className="flex items-center gap-2">
-              Rota atual:
-              <span className="font-mono-type font-bold uppercase tracking-widest text-gold">
-                {route.target.join(" ")}
-              </span>
-            </span>
-            {route.detected.length > 0 && (
-              <span className="text-muted-foreground">
-                detectadas pelo professor:{" "}
-                <span className="font-mono-type uppercase text-destructive font-bold">
-                  {route.detected.join(" ")}
-                </span>
-              </span>
-            )}
-          </div>
-        )}
-        {mode === "estudos" && (
-          <div className="space-y-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
-            <div className="flex flex-wrap items-center gap-3">
-              <label htmlFor="area" className="font-medium">
-                Matéria (OAB):
-              </label>
-              <select
-                id="area"
-                value={area}
-                onChange={(ev) => setArea(ev.target.value)}
-                className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
-              >
-                {AREAS.map((a) => (
-                  <option key={a}>{a}</option>
-                ))}
-                <option value={CUSTOM}>Outra matéria…</option>
-              </select>
-              {area === CUSTOM && (
-                <input
-                  value={customArea}
-                  onChange={(ev) => setCustomArea(ev.target.value.slice(0, 120))}
-                  placeholder="Ex.: recursos no STJ, LGPD, contratos bancários…"
-                  className="min-w-64 flex-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm"
-                />
-              )}
-              <label htmlFor="lines" className="font-medium">
-                Linhas:
-              </label>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleLineCountChange((n) => Math.max(1, n - 1))}
-                  className="h-7 w-7 rounded-md border border-border bg-card hover:bg-secondary transition-colors"
-                  aria-label="Menos linhas"
-                >
-                  −
-                </button>
-                <span id="lines" className="w-6 text-center font-mono-type font-bold text-gold">
-                  {lineCount}
-                </span>
-                <button
-                  onClick={() => handleLineCountChange((n) => Math.min(10, n + 1))}
-                  className="h-7 w-7 rounded-md border border-border bg-card hover:bg-secondary transition-colors"
-                  aria-label="Mais linhas"
-                >
-                  +
-                </button>
+              <div className="text-[0.65rem] font-semibold uppercase tracking-wider text-gold">
+                Prof. Dr. Rigoroso
               </div>
+              {quote.text || "…"}
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="cursor-pointer rounded-md border border-dashed border-gold/50 bg-card px-3 py-1.5 text-xs hover:border-gold">
-                📎{" "}
-                {reference
-                  ? `Referência: ${reference.name}`
-                  : "Enviar arquivo de referência (.txt, .md)"}
-                <input
-                  type="file"
-                  accept=".txt,.md,.csv,.json,.html,text/*"
-                  className="hidden"
-                  onChange={(ev) => void onFile(ev.target.files?.[0])}
-                />
-              </label>
-              {reference && (
-                <button
-                  onClick={() => setReference(null)}
-                  className="text-xs text-muted-foreground hover:text-destructive"
-                >
-                  remover
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setStudyQueue([]);
-                  void nextStudy([], selectedKeys, effectiveArea);
-                }}
-                disabled={studyLoading}
-                className="rounded-md bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground disabled:opacity-50"
-              >
-                {studyLoading ? "Gerando…" : "Gerar nova aula"}
-              </button>
-              {studyQueue.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {studyQueue.length} linha(s) restante(s)
+          </div>
+
+          {/* Info do modo */}
+          {mode === "automatico" && route && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
+              <span>
+                Nível <span className="font-mono-type font-bold text-gold">{level}/10</span>
+              </span>
+              <span className="flex items-center gap-2">
+                Rota atual:
+                <span className="font-mono-type font-bold uppercase tracking-widest text-gold">
+                  {route.target.join(" ")}
                 </span>
-              )}
-              {studyError && <span className="text-xs text-destructive">{studyError}</span>}
-            </div>
-            {reference && reference.sentences.length > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gold/20 pt-2 text-xs">
+              </span>
+              {route.detected.length > 0 && (
                 <span className="text-muted-foreground">
-                  📄 <strong>{reference.name}</strong>: {reference.sentences.length} frases prontas para treino.
+                  detectadas pelo professor:{" "}
+                  <span className="font-mono-type uppercase text-destructive font-bold">
+                    {route.detected.join(" ")}
+                  </span>
                 </span>
-                <button
-                  onClick={practiceReferenceSentence}
-                  className="rounded bg-gold/20 hover:bg-gold hover:text-gold-foreground text-gold px-3 py-1 font-semibold transition-colors"
-                  title="Carregar a próxima frase do seu arquivo para praticar imediatamente"
-                >
-                  ⚡ Digitar Frase do Arquivo ({reference.activeSentenceIdx + 1}/{reference.sentences.length})
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Info do modo Lei Seca */}
-        {mode === "leiseca" && (
-          <div className="space-y-3.5 rounded-xl border border-gold/40 bg-gold/5 p-4 text-sm shadow-sm backdrop-blur-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5">
-                <div className="flex items-center gap-1.5">
-                  <label htmlFor="diploma-leiseca" className="text-xs font-semibold text-foreground">
-                    📜 Diploma:
-                  </label>
-                  <select
-                    id="diploma-leiseca"
-                    value={leiSecaDiploma}
-                    onChange={(ev) => {
-                      const nx = ev.target.value;
-                      setLeiSecaDiploma(nx);
-                      setLeiSecaStartingId("random");
-                      nextLeiSeca(leiSecaEixo, true, nx);
-                    }}
-                    className="max-w-[190px] sm:max-w-[240px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
-                  >
-                    {availableDiplomas.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <label htmlFor="eixo-leiseca" className="text-xs font-semibold text-foreground">
-                    ⚖️ Eixo:
-                  </label>
-                  <select
-                    id="eixo-leiseca"
-                    value={leiSecaEixo}
-                    onChange={(ev) => {
-                      const nx = ev.target.value;
-                      setLeiSecaEixo(nx);
-                      setLeiSecaStartingId("random");
-                      nextLeiSeca(nx, true, leiSecaDiploma);
-                    }}
-                    className="max-w-[170px] sm:max-w-[210px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
-                  >
-                    {LEI_SECA_EIXOS.map((e) => (
-                      <option key={e} value={e}>
-                        {e}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <label htmlFor="artigo-inicial" className="text-xs font-medium text-muted-foreground">
-                    Dispositivo:
-                  </label>
-                  <select
-                    id="artigo-inicial"
-                    value={leiSecaStartingId}
-                    onChange={(ev) => {
-                      const val = ev.target.value;
-                      setLeiSecaStartingId(val);
-                      if (val === "random") {
-                        nextLeiSeca(leiSecaEixo, true, leiSecaDiploma);
-                      } else {
-                        const target = getLeiSecaItemById(val);
-                        if (target) {
-                          setCurrentLeiSeca(target);
-                          const st = leiSecaToStudyItem(target);
-                          setCurrentStudy(st);
-                          loadText(target.texto);
-                        }
-                      }
-                    }}
-                    className="max-w-[190px] sm:max-w-[250px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
-                  >
-                    <option value="random">🎲 Aleatório ({availableLeiSecaItems.length} disp.)</option>
-                    {availableLeiSecaItems.slice(0, 250).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.dispositivo} - {item.diploma}
-                      </option>
-                    ))}
-                    {availableLeiSecaItems.length > 250 && (
-                      <option disabled value="">
-                        ... e mais {availableLeiSecaItems.length - 250} (selecione o Diploma acima para filtrar)
-                      </option>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <button
-                  onClick={() => prevLeiSeca(leiSecaEixo, leiSecaDiploma)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary shadow-sm transition-transform active:scale-95"
-                  title="Retornar ao dispositivo anterior"
-                >
-                  <span>◀ Artigo Anterior</span>
-                </button>
-                <button
-                  onClick={() => nextLeiSeca(leiSecaEixo, leiSecaStartingId === "random", leiSecaDiploma)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm transition-transform active:scale-95"
-                  title="Avançar para o próximo dispositivo"
-                >
-                  <span>{leiSecaStartingId === "random" ? "🎲 Sortear Artigo →" : "Próximo Artigo ▶"}</span>
-                </button>
-              </div>
+              )}
             </div>
+          )}
+          {mode === "estudos" && (
+            <div className="space-y-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-center gap-3">
+                <label htmlFor="area" className="font-medium">
+                  Matéria (OAB):
+                </label>
+                <select
+                  id="area"
+                  value={area}
+                  onChange={(ev) => handleAreaChange(ev.target.value)}
+                  className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+                >
+                  {AREAS.map((a) => (
+                    <option key={a}>{a}</option>
+                  ))}
+                  <option value={CUSTOM}>Outra matéria…</option>
+                </select>
+                {area === CUSTOM && (
+                  <div className="flex items-center gap-1.5 flex-1 min-w-64">
+                    <input
+                      value={customArea}
+                      onChange={(ev) => setCustomArea(ev.target.value.slice(0, 120))}
+                      onKeyDown={(ev) => {
+                        if (ev.key === "Enter") handleAreaChange(CUSTOM);
+                      }}
+                      placeholder="Ex.: recursos no STJ, LGPD, contratos bancários…"
+                      className="flex-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+                    />
+                    <button
+                      onClick={() => handleAreaChange(CUSTOM)}
+                      className="rounded-md bg-gold px-2.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                )}
+                <label htmlFor="lines" className="font-medium">
+                  Linhas:
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleLineCountChange((n) => Math.max(1, n - 1))}
+                    className="h-7 w-7 rounded-md border border-border bg-card hover:bg-secondary transition-colors"
+                    aria-label="Menos linhas"
+                  >
+                    −
+                  </button>
+                  <span id="lines" className="w-6 text-center font-mono-type font-bold text-gold">
+                    {lineCount}
+                  </span>
+                  <button
+                    onClick={() => handleLineCountChange((n) => Math.min(10, n + 1))}
+                    className="h-7 w-7 rounded-md border border-border bg-card hover:bg-secondary transition-colors"
+                    aria-label="Mais linhas"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="cursor-pointer rounded-md border border-dashed border-gold/50 bg-card px-3 py-1.5 text-xs hover:border-gold">
+                  📎{" "}
+                  {reference
+                    ? `Referência: ${reference.name}`
+                    : "Enviar arquivo de referência (.txt, .md)"}
+                  <input
+                    type="file"
+                    accept=".txt,.md,.csv,.json,.html,text/*"
+                    className="hidden"
+                    onChange={(ev) => void onFile(ev.target.files?.[0])}
+                  />
+                </label>
+                {reference && (
+                  <button
+                    onClick={() => setReference(null)}
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    remover
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setStudyQueue([]);
+                    void nextStudy([], selectedKeys, effectiveArea);
+                  }}
+                  disabled={studyLoading}
+                  className="rounded-md bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground disabled:opacity-50"
+                >
+                  {studyLoading ? "Gerando…" : "Gerar nova aula"}
+                </button>
+                {studyQueue.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {studyQueue.length} linha(s) restante(s)
+                  </span>
+                )}
+                {studyError && <span className="text-xs text-destructive">{studyError}</span>}
+              </div>
+              {reference && reference.sentences.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gold/20 pt-2 text-xs">
+                  <span className="text-muted-foreground">
+                    📄 <strong>{reference.name}</strong>: {reference.sentences.length} frases
+                    prontas para treino.
+                  </span>
+                  <button
+                    onClick={practiceReferenceSentence}
+                    className="rounded bg-gold/20 hover:bg-gold hover:text-gold-foreground text-gold px-3 py-1 font-semibold transition-colors"
+                    title="Carregar a próxima frase do seu arquivo para praticar imediatamente"
+                  >
+                    ⚡ Digitar Frase do Arquivo ({reference.activeSentenceIdx + 1}/
+                    {reference.sentences.length})
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
-            {currentLeiSeca && (
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-gold/20 text-xs">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold text-gold">
-                    📜 {currentLeiSeca.diploma}:
-                  </span>
-                  <span className="rounded bg-gold/15 px-2.5 py-0.5 font-bold text-foreground">
-                    {currentLeiSeca.dispositivo}
-                  </span>
-                  <span className="rounded bg-secondary/80 px-2 py-0.5 text-[11px] text-muted-foreground">
-                    {currentLeiSeca.eixo}
+          {/* Info do modo Lei Seca */}
+          {mode === "leiseca" && (
+            <div className="space-y-3.5 rounded-xl border border-gold/40 bg-gold/5 p-4 text-sm shadow-sm backdrop-blur-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5">
+                  <div className="flex items-center gap-1.5">
+                    <label
+                      htmlFor="diploma-leiseca"
+                      className="text-xs font-semibold text-foreground"
+                    >
+                      📜 Diploma:
+                    </label>
+                    <select
+                      id="diploma-leiseca"
+                      value={leiSecaDiploma}
+                      onChange={(ev) => {
+                        const nx = ev.target.value;
+                        setLeiSecaDiploma(nx);
+                        setLeiSecaStartingId("random");
+                        nextLeiSeca(leiSecaEixo, true, nx);
+                      }}
+                      className="max-w-[190px] sm:max-w-[240px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
+                    >
+                      {availableDiplomas.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="eixo-leiseca" className="text-xs font-semibold text-foreground">
+                      ⚖️ Eixo:
+                    </label>
+                    <select
+                      id="eixo-leiseca"
+                      value={leiSecaEixo}
+                      onChange={(ev) => {
+                        const nx = ev.target.value;
+                        setLeiSecaEixo(nx);
+                        setLeiSecaStartingId("random");
+                        nextLeiSeca(nx, true, leiSecaDiploma);
+                      }}
+                      className="max-w-[170px] sm:max-w-[210px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs sm:text-sm font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
+                    >
+                      {LEI_SECA_EIXOS.map((e) => (
+                        <option key={e} value={e}>
+                          {e}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <label
+                      htmlFor="artigo-inicial"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Dispositivo:
+                    </label>
+                    <select
+                      id="artigo-inicial"
+                      value={leiSecaStartingId}
+                      onChange={(ev) => {
+                        const val = ev.target.value;
+                        setLeiSecaStartingId(val);
+                        if (val === "random") {
+                          nextLeiSeca(leiSecaEixo, true, leiSecaDiploma);
+                        } else {
+                          const target = getLeiSecaItemById(val);
+                          if (target) {
+                            setCurrentLeiSeca(target);
+                            const st = leiSecaToStudyItem(target);
+                            setCurrentStudy(st);
+                            loadText(target.texto);
+                          }
+                        }
+                      }}
+                      className="max-w-[190px] sm:max-w-[250px] truncate rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm focus:border-gold focus:outline-none"
+                    >
+                      <option value="random">
+                        🎲 Aleatório ({availableLeiSecaItems.length} disp.)
+                      </option>
+                      {availableLeiSecaItems.slice(0, 250).map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.dispositivo} - {item.diploma}
+                        </option>
+                      ))}
+                      {availableLeiSecaItems.length > 250 && (
+                        <option disabled value="">
+                          ... e mais {availableLeiSecaItems.length - 250} (selecione o Diploma acima
+                          para filtrar)
+                        </option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <button
+                    onClick={() => prevLeiSeca(leiSecaEixo, leiSecaDiploma)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary shadow-sm transition-transform active:scale-95"
+                    title="Retornar ao dispositivo anterior"
+                  >
+                    <span>◀ Artigo Anterior</span>
+                  </button>
+                  <button
+                    onClick={() =>
+                      nextLeiSeca(leiSecaEixo, leiSecaStartingId === "random", leiSecaDiploma)
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90 shadow-sm transition-transform active:scale-95"
+                    title="Avançar para o próximo dispositivo"
+                  >
+                    <span>
+                      {leiSecaStartingId === "random" ? "🎲 Sortear Artigo →" : "Próximo Artigo ▶"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {currentLeiSeca && (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-gold/20 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-gold">📜 {currentLeiSeca.diploma}:</span>
+                    <span className="rounded bg-gold/15 px-2.5 py-0.5 font-bold text-foreground">
+                      {currentLeiSeca.dispositivo}
+                    </span>
+                    <span className="rounded bg-secondary/80 px-2 py-0.5 text-[11px] text-muted-foreground">
+                      {currentLeiSeca.eixo}
+                    </span>
+                  </div>
+                  <span className="text-muted-foreground hidden sm:inline font-mono-type text-[11px]">
+                    🏛️ {currentLeiSeca.fonteOficial}
                   </span>
                 </div>
-                <span className="text-muted-foreground hidden sm:inline font-mono-type text-[11px]">
-                  🏛️ {currentLeiSeca.fonteOficial}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
-        {/* Barra de Status e Restauração dos Painéis Independentes */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <span>📐 <strong>Painéis Modulares:</strong> use ▲▼ para reposicionar e ◀ Esquerda / Direita ▶ para alargar as caixas.</span>
+          {/* Barra de Status e Restauração dos Painéis Independentes */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span>
+                📐 <strong>Painéis Modulares:</strong> use ▲▼ para reposicionar e ◀ Esquerda /
+                Direita ▶ para alargar as caixas.
+              </span>
+            </div>
+            <button
+              onClick={resetBoxes}
+              className="hover:text-gold text-[11px] underline transition-colors"
+              title="Restaurar posições originais das caixas"
+            >
+              ↺ Restaurar ordem padrão
+            </button>
           </div>
-          <button
-            onClick={resetBoxes}
-            className="hover:text-gold text-[11px] underline transition-colors"
-            title="Restaurar posições originais das caixas"
-          >
-            ↺ Restaurar ordem padrão
-          </button>
-        </div>
 
-        {/* Blocos Modulares e Reposicionáveis */}
-        <div className="space-y-6">
-          {boxOrder.map((boxId) => {
-            if (boxId === "typing") {
-              return (
-                <MovableCard
-                  key="typing"
-                  id="typing"
-                  title="Área de Digitação"
-                  icon="⌨️"
-                  canMoveUp={boxOrder.indexOf("typing") > 0}
-                  canMoveDown={boxOrder.indexOf("typing") < boxOrder.length - 1}
-                  onMoveUp={() => moveBox("typing", "up")}
-                  onMoveDown={() => moveBox("typing", "down")}
-                  extraHeaderControls={
-                    <div className="flex items-center gap-2">
-                      {lineCount === 1 && (
-                        <span className="rounded bg-gold/15 px-2 py-0.5 text-[0.65rem] font-bold text-gold">
-                          Linha Única
-                        </span>
-                      )}
-                      <div className="flex items-center rounded-md border border-border bg-card text-xs">
-                        <span className="px-2 py-0.5 text-[0.65rem] text-muted-foreground">Fonte:</span>
-                        <button
-                          onClick={() => {
-                            const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
-                            const idx = Math.max(0, sizes.indexOf(fontTyping) - 1);
-                            setFontTyping(sizes[idx]!);
-                            localStorage.setItem("lextype-font-typing", sizes[idx]!);
-                          }}
-                          disabled={fontTyping === "sm"}
-                          className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 border-r border-border font-bold"
-                          title="Diminuir fonte da digitação"
+          {/* Blocos Modulares e Reposicionáveis */}
+          <div className="space-y-6">
+            {boxOrder.map((boxId) => {
+              if (boxId === "typing") {
+                return (
+                  <MovableCard
+                    key="typing"
+                    id="typing"
+                    title="Área de Digitação"
+                    icon="⌨️"
+                    canMoveUp={boxOrder.indexOf("typing") > 0}
+                    canMoveDown={boxOrder.indexOf("typing") < boxOrder.length - 1}
+                    onMoveUp={() => moveBox("typing", "up")}
+                    onMoveDown={() => moveBox("typing", "down")}
+                    extraHeaderControls={
+                      <div className="flex items-center gap-2">
+                        {lineCount === 1 && (
+                          <span className="rounded bg-gold/15 px-2 py-0.5 text-[0.65rem] font-bold text-gold">
+                            Linha Única
+                          </span>
+                        )}
+                        {/* Seletor rápido de modo de erro */}
+                        <select
+                          value={prefs.errorMode}
+                          onChange={(ev) =>
+                            updatePrefs({ errorMode: ev.target.value as TypingErrorMode })
+                          }
+                          className="rounded-md border border-border bg-card px-2 py-0.5 text-xs font-semibold text-foreground focus:border-gold focus:outline-none shadow-sm"
+                          title="Modo de tolerância e tratamento de erros"
                         >
-                          A−
-                        </button>
-                        <button
-                          onClick={() => {
-                            const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
-                            const idx = Math.min(sizes.length - 1, sizes.indexOf(fontTyping) + 1);
-                            setFontTyping(sizes[idx]!);
-                            localStorage.setItem("lextype-font-typing", sizes[idx]!);
-                          }}
-                          disabled={fontTyping === "xl"}
-                          className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 font-bold"
-                          title="Aumentar fonte da digitação"
-                        >
-                          A+
-                        </button>
+                          <option value="fluid">🌊 Fluido</option>
+                          <option value="strict">🛑 Estrito</option>
+                          <option value="restart">⚡ Morte Súbita</option>
+                          <option value="nobackspace">🥋 Sem Backspace</option>
+                        </select>
+                        <div className="flex items-center rounded-md border border-border bg-card text-xs">
+                          <span className="px-2 py-0.5 text-[0.65rem] text-muted-foreground">
+                            Fonte:
+                          </span>
+                          <button
+                            onClick={() => {
+                              const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                              const idx = Math.max(0, sizes.indexOf(fontTyping) - 1);
+                              setFontTyping(sizes[idx]!);
+                              localStorage.setItem("lextype-font-typing", sizes[idx]!);
+                            }}
+                            disabled={fontTyping === "sm"}
+                            className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 border-r border-border font-bold"
+                            title="Diminuir fonte da digitação"
+                          >
+                            A−
+                          </button>
+                          <button
+                            onClick={() => {
+                              const sizes: ("sm" | "md" | "lg" | "xl")[] = ["sm", "md", "lg", "xl"];
+                              const idx = Math.min(sizes.length - 1, sizes.indexOf(fontTyping) + 1);
+                              setFontTyping(sizes[idx]!);
+                              localStorage.setItem("lextype-font-typing", sizes[idx]!);
+                            }}
+                            disabled={fontTyping === "xl"}
+                            className="px-2 py-0.5 hover:bg-secondary disabled:opacity-30 font-bold"
+                            title="Aumentar fonte da digitação"
+                          >
+                            A+
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  }
-                >
-                  <section
-                    onClick={() => inputRef.current?.focus()}
-                    style={{
-                      minHeight: lineCount === 1 ? "5.5rem" : `${Math.max(8.5, 4.5 + lineCount * 2.8)}rem`,
-                      maxHeight: lineCount === 1 ? "8.5rem" : "75vh",
-                    }}
-                    className={cn(
-                      "relative rounded-lg p-2 transition-all duration-300 overflow-auto",
-                      focused ? "ring-1 ring-gold/30" : "",
-                    )}
+                    }
                   >
-                    {result ? (
-                      <ResultView result={result} weak={weak} repeat={repeat} onNext={goNext} />
-                    ) : (
-                      <>
-                        <div className="mb-2 h-1 overflow-hidden rounded-full bg-secondary">
-                          <div
-                            className="h-full bg-gold transition-all duration-150"
-                            style={{ width: `${progress * 100}%` }}
-                          />
-                        </div>
-                        <div className="mb-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-mono-type text-sm">
-                          <span className="text-muted-foreground">
-                            PPM <span className="font-bold text-gold">{liveWpm}</span>
-                          </span>
-                          <span className="text-muted-foreground">
-                            Precisão <span className="font-bold text-foreground">{liveAcc}%</span>
-                          </span>
-                          <span className="text-muted-foreground">
-                            Tempo <span className="font-bold text-foreground">{elapsed.toFixed(0)}s</span>
-                          </span>
-                          <span
-                            key={comboPulse}
-                            className={cn(
-                              "animate-combo text-muted-foreground",
-                              e.combo >= 10 && "text-gold",
-                            )}
-                          >
-                            Combo <span className="font-bold">{e.combo}</span>
-                            {e.combo >= 25 ? " 🔥" : ""}
-                            {e.combo >= 50 ? "🔥" : ""}
-                          </span>
-                        </div>
-                        {studyLoading ? (
-                          <p className="py-6 text-center text-muted-foreground">
-                            O professor está preparando a aula de {effectiveArea}…
-                          </p>
-                        ) : (
-                          <>
-                            {typingParts.length > 1 && (
-                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gold/30 bg-gold/5 px-3.5 py-1.5 text-xs">
-                                <div className="flex items-center gap-2 font-medium">
-                                  <span className="text-gold font-bold">📑 Dispositivo em Partes:</span>
-                                  <span className="rounded bg-gold/20 px-2 py-0.5 font-mono-type font-bold text-foreground">
-                                    Parte {partIndex + 1} de {typingParts.length}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      if (partIndex > 0) {
-                                        const prevIdx = partIndex - 1;
-                                        setPartIndex(prevIdx);
-                                        eng.current = newEngine(typingParts[prevIdx]!);
-                                        consumed.current = 0;
-                                        if (inputRef.current) inputRef.current.value = "";
-                                        rerender();
-                                      }
-                                    }}
-                                    disabled={partIndex === 0}
-                                    className="rounded border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-30 transition-colors"
-                                  >
-                                    ◀ Parte Anterior
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (partIndex < typingParts.length - 1) {
-                                        const nextIdx = partIndex + 1;
-                                        setPartIndex(nextIdx);
-                                        eng.current = newEngine(typingParts[nextIdx]!);
-                                        consumed.current = 0;
-                                        if (inputRef.current) inputRef.current.value = "";
-                                        rerender();
-                                      }
-                                    }}
-                                    disabled={partIndex >= typingParts.length - 1}
-                                    className="rounded border border-gold/40 bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold hover:bg-gold/25 disabled:opacity-30 transition-colors"
-                                  >
-                                    Próxima Parte ▶
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                            <p
-                            className={cn(
-                              "font-mono-type leading-relaxed tracking-wide transition-all",
-                              TYPING_FONT_CLASSES[fontTyping],
-                              lineCount === 1 && "overflow-hidden",
-                            )}
-                          >
-                            {e.text.split("").map((ch, i) => {
-                              const isErrorMark = e.marks[i] === true;
-                              return (
-                                <span
-                                  key={i}
-                                  className={cn(
-                                    i < pos &&
-                                      (isErrorMark
-                                        ? "rounded-sm bg-destructive/25 text-destructive font-bold underline"
-                                        : "text-muted-foreground/40"),
-                                    i === pos &&
-                                      (prefs.stopOnError && e.wrongAt === i
-                                        ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake"
-                                        : "rounded-sm bg-gold/30 text-gold animate-caret"),
-                                    i > pos && "text-foreground",
-                                  )}
-                                >
-                                  {ch === " " && i === pos ? "␣" : ch}
-                                </span>
-                              );
-                            })}
-                          </p>
-                        </>
-                        )}
-
-                        {/* Semântica e Impacto Prático do Termo Mais Complexo */}
-                        {complexTerm && !result && (
-                          <div className="mt-4 rounded-lg border border-gold/40 bg-gold/5 p-3.5 text-xs">
-                            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                              <div className="flex items-center gap-1.5 font-bold text-gold">
-                                <span>📖 Vocabulário Jurídico Chave:</span>
-                                <span className="font-mono-type bg-gold/20 px-2 py-0.5 rounded text-foreground uppercase tracking-wide">
-                                  {complexTerm.termo}
-                                </span>
-                              </div>
-                              <span className="text-[10px] uppercase font-bold text-muted-foreground bg-secondary px-2 py-0.5 rounded">
-                                {complexTerm.categoria}
-                              </span>
-                            </div>
-                            <p className="text-foreground leading-relaxed">
-                              <strong>Significado Técnico:</strong> {complexTerm.significado}
-                            </p>
-                          </div>
-                        )}
-
-                        <p className="mt-5 text-center text-xs text-muted-foreground">
-                          {focused
-                            ? prefs.stopOnError
-                              ? "Modo estrito: o cursor trava na letra errada até você acertar."
-                              : "Modo fluido: continue digitando e use Backspace para retornar e corrigir as letras em vermelho."
-                            : "🎯 A velocidade surge da precisão. Clique ou toque aqui para começar."}
-                        </p>
-                        <input
-                          ref={inputRef}
-                          aria-label="Área de digitação"
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          autoComplete="off"
-                          spellCheck={false}
-                          enterKeyHint="next"
-                          className="absolute inset-0 h-full w-full cursor-text opacity-0"
-                          onFocus={() => setFocused(true)}
-                          onBlur={() => setFocused(false)}
-                          onCompositionEnd={(ev) => {
-                            composing.current = false;
-                            handleInput(ev.currentTarget, true);
-                          }}
-                          onInput={(ev) => handleInput(ev.currentTarget, false)}
-                        />
-                      </>
-                    )}
-                  </section>
-
-                  {/* Controles rápidos logo abaixo da digitação */}
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3 border-t border-border/40 pt-3">
-                    <button
-                      onClick={() => setRepeat((r) => !r)}
-                      aria-pressed={repeat}
-                      title="Repetir a mesma frase deliberadamente"
+                    <section
+                      onClick={() => inputRef.current?.focus()}
+                      style={{
+                        minHeight:
+                          lineCount === 1 ? "5.5rem" : `${Math.max(8.5, 4.5 + lineCount * 2.8)}rem`,
+                        maxHeight: lineCount === 1 ? "8.5rem" : "75vh",
+                      }}
                       className={cn(
-                        "rounded-full border px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors",
-                        repeat
-                          ? "border-gold bg-gold text-gold-foreground"
-                          : "border-border bg-card text-muted-foreground hover:text-foreground",
+                        "relative rounded-lg p-2 transition-all duration-300 overflow-auto",
+                        focused ? "ring-1 ring-gold/30" : "",
                       )}
                     >
-                      🔁 Repetir frase {repeat ? "ligado" : "desligado"}
-                    </button>
-                    {!result && e.text && (
-                      <button
-                        onClick={handleRestartLine}
-                        className="rounded-full border border-border bg-card px-4 py-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
-                      >
-                        ↺ Recomeçar esta
-                      </button>
-                    )}
-                  </div>
-                </MovableCard>
-              );
-            }
-
-            if (boxId === "lesson") {
-              const activeLesson = pinned || currentStudy;
-              return (
-                <MovableCard
-                  key="lesson"
-                  id="lesson"
-                  title="Aula & Virada de Chave"
-                  icon="🎓"
-                  canMoveUp={boxOrder.indexOf("lesson") > 0}
-                  canMoveDown={boxOrder.indexOf("lesson") < boxOrder.length - 1}
-                  onMoveUp={() => moveBox("lesson", "up")}
-                  onMoveDown={() => moveBox("lesson", "down")}
-                >
-                  {result && activeLesson ? (
-                    <LessonCard
-                      item={activeLesson}
-                      onClose={() => {
-                        setPinned(null);
-                        setCurrentStudy(null);
-                      }}
-                      fontStudy={fontStudy}
-                      onFontChange={(f) => {
-                        setFontStudy(f);
-                        localStorage.setItem("lextype-font-study", f);
-                      }}
-                    />
-                  ) : activeLesson ? (
-                    <div className="rounded-lg border border-gold/30 bg-gold/5 p-6 text-center space-y-2">
-                      <div className="text-3xl">🔒</div>
-                      <div className="text-xs font-bold uppercase tracking-wider text-gold">
-                        Virada de Chave Protegida
-                      </div>
-                      <p className="text-sm font-semibold text-foreground">
-                        {mode === "leiseca" && currentLeiSeca
-                          ? `${currentLeiSeca.dispositivo} (${currentLeiSeca.diploma})`
-                          : activeLesson.virada.titulo}
-                      </p>
-                      <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-                        {mode === "leiseca"
-                          ? "Foque na digitação do dispositivo legal acima. O conceito doutrinário, a tese vinculante e o caso concreto serão revelados ao final!"
-                          : "Foque na cadência e na precisão dos dedos. A Virada de Chave (critério decisivo, requisitos e caso prático) será revelada assim que você concluir a digitação!"}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-border/70 p-6 text-center text-muted-foreground">
-                      <p className="text-sm font-medium mb-1">🎓 Nenhuma virada de chave carregada no momento.</p>
-                      <p className="text-xs mb-3 text-muted-foreground/80">
-                        No modo <strong>Estudos Jurídicos</strong> ou <strong>Lei Seca</strong>, este painel exibirá o conceito estruturado, critério decisivo e o caso prático correspondente ao final de cada item.
-                      </p>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        <button
-                          onClick={() => {
-                            changeMode("estudos");
-                            void nextStudy([], selectedKeys, effectiveArea);
-                          }}
-                          className="rounded-md bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90"
-                        >
-                          Iniciar Estudos Jurídicos
-                        </button>
-                        <button
-                          onClick={() => {
-                            changeMode("leiseca");
-                          }}
-                          className="rounded-md border border-gold text-gold hover:bg-gold/10 px-3.5 py-1.5 text-xs font-semibold"
-                        >
-                          Treinar Lei Seca
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </MovableCard>
-              );
-            }
-
-            if (boxId === "keyboard") {
-              return (
-                <MovableCard
-                  key="keyboard"
-                  id="keyboard"
-                  title={`Teclado Virtual (${keyboardLayout.toUpperCase()})`}
-                  icon="⌨️"
-                  canMoveUp={boxOrder.indexOf("keyboard") > 0}
-                  canMoveDown={boxOrder.indexOf("keyboard") < boxOrder.length - 1}
-                  onMoveUp={() => moveBox("keyboard", "up")}
-                  onMoveDown={() => moveBox("keyboard", "down")}
-                >
-                  <Keyboard
-                    nextKeys={nextKeys}
-                    stats={keyStats}
-                    selectedKeys={[]}
-                    flash={flash}
-                    layout={keyboardLayout}
-                    scale={uiScale}
-                    mode={keyboardMode}
-                  />
-                  <div className="mt-4 flex flex-wrap justify-center gap-5 text-xs text-muted-foreground">
-                    {keyboardMode === "heatmap" ? (
-                      <>
-                        <Legend cls="bg-success/40" label="dominada" />
-                        <Legend cls="bg-gold/30" label="em progresso" />
-                        <Legend cls="bg-destructive/40" label="precisa de treino" />
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Zonas coloridas por dedo. A tecla atual acende com brilho vibrante.
-                      </span>
-                    )}
-                  </div>
-                </MovableCard>
-              );
-            }
-
-            if (boxId === "keys") {
-              return (
-                <MovableCard
-                  key="keys"
-                  id="keys"
-                  title={mode === "automatico" ? "Diagnóstico de Teclas Críticas" : "Teclas-Alvo do Treino"}
-                  icon="🎯"
-                  canMoveUp={boxOrder.indexOf("keys") > 0}
-                  canMoveDown={boxOrder.indexOf("keys") < boxOrder.length - 1}
-                  onMoveUp={() => moveBox("keys", "up")}
-                  onMoveDown={() => moveBox("keys", "down")}
-                >
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                      {mode === "automatico"
-                        ? "Marque as teclas em que você tem mais dificuldade"
-                        : "Teclas selecionadas para repetição"}
-                    </h2>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(KEY_GROUPS).map(([name, g]) => (
-                        <button
-                          key={name}
-                          onClick={() => toggleGroup(g)}
-                          className={cn(
-                            "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
-                            g.every((k) => selectedKeys.includes(k))
-                              ? "border-gold bg-gold/15 text-gold"
-                              : "border-border bg-secondary text-secondary-foreground hover:text-gold",
+                      {result ? (
+                        <ResultView result={result} weak={weak} repeat={repeat} onNext={goNext} />
+                      ) : (
+                        <>
+                          <div className="mb-2 h-1 overflow-hidden rounded-full bg-secondary">
+                            <div
+                              className="h-full bg-gold transition-all duration-150"
+                              style={{ width: `${progress * 100}%` }}
+                            />
+                          </div>
+                          <div className="mb-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-mono-type text-sm">
+                            <span className="text-muted-foreground">
+                              PPM <span className="font-bold text-gold">{liveWpm}</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Precisão <span className="font-bold text-foreground">{liveAcc}%</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Tempo{" "}
+                              <span className="font-bold text-foreground">
+                                {elapsed.toFixed(0)}s
+                              </span>
+                            </span>
+                            <span
+                              key={comboPulse}
+                              className={cn(
+                                "animate-combo text-muted-foreground",
+                                e.combo >= 10 && "text-gold",
+                              )}
+                            >
+                              Combo <span className="font-bold">{e.combo}</span>
+                              {e.combo >= 25 ? " 🔥" : ""}
+                              {e.combo >= 50 ? "🔥" : ""}
+                            </span>
+                          </div>
+                          {studyLoading ? (
+                            <p className="py-6 text-center text-muted-foreground">
+                              O professor está preparando a aula de {effectiveArea}…
+                            </p>
+                          ) : (
+                            <>
+                              {typingParts.length > 1 && (
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gold/30 bg-gold/5 px-3.5 py-1.5 text-xs">
+                                  <div className="flex items-center gap-2 font-medium">
+                                    <span className="text-gold font-bold">
+                                      📑 Dispositivo em Partes:
+                                    </span>
+                                    <span className="rounded bg-gold/20 px-2 py-0.5 font-mono-type font-bold text-foreground">
+                                      Parte {partIndex + 1} de {typingParts.length}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        if (partIndex > 0) {
+                                          const prevIdx = partIndex - 1;
+                                          setPartIndex(prevIdx);
+                                          eng.current = newEngine(typingParts[prevIdx]!);
+                                          consumed.current = 0;
+                                          if (inputRef.current) inputRef.current.value = "";
+                                          rerender();
+                                        }
+                                      }}
+                                      disabled={partIndex === 0}
+                                      className="rounded border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-30 transition-colors"
+                                    >
+                                      ◀ Parte Anterior
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (partIndex < typingParts.length - 1) {
+                                          const nextIdx = partIndex + 1;
+                                          setPartIndex(nextIdx);
+                                          eng.current = newEngine(typingParts[nextIdx]!);
+                                          consumed.current = 0;
+                                          if (inputRef.current) inputRef.current.value = "";
+                                          rerender();
+                                        }
+                                      }}
+                                      disabled={partIndex >= typingParts.length - 1}
+                                      className="rounded border border-gold/40 bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold hover:bg-gold/25 disabled:opacity-30 transition-colors"
+                                    >
+                                      Próxima Parte ▶
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              <p
+                                className={cn(
+                                  "font-mono-type leading-relaxed tracking-wide transition-all",
+                                  TYPING_FONT_CLASSES[fontTyping],
+                                  lineCount === 1 && "overflow-hidden",
+                                )}
+                              >
+                                {e.text.split("").map((ch, i) => {
+                                  const isErrorMark = e.marks[i] === true;
+                                  return (
+                                    <span
+                                      key={i}
+                                      className={cn(
+                                        i < pos &&
+                                          (isErrorMark
+                                            ? "rounded-sm bg-destructive/25 text-destructive font-bold underline"
+                                            : "text-muted-foreground/40"),
+                                        i === pos &&
+                                          ((prefs.errorMode === "strict" || prefs.stopOnError) &&
+                                          e.wrongAt === i
+                                            ? "rounded-sm bg-destructive/40 text-destructive-foreground animate-shake"
+                                            : "rounded-sm bg-gold/30 text-gold animate-caret"),
+                                        i > pos && "text-foreground",
+                                      )}
+                                    >
+                                      {ch === " " && i === pos ? "␣" : ch}
+                                    </span>
+                                  );
+                                })}
+                              </p>
+                            </>
                           )}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => applyKeys(TRAINABLE_KEYS)}
-                        className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-gold"
-                      >
-                        Todas
-                      </button>
-                      <button
-                        onClick={() => applyKeys([])}
-                        className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-destructive"
-                      >
-                        Limpar
-                      </button>
-                    </div>
-                  </div>
-                  <Keyboard
-                    stats={keyStats}
-                    selectedKeys={selectedKeys}
-                    onToggle={toggleKey}
-                    layout={keyboardLayout}
-                    compact
-                  />
-                </MovableCard>
-              );
-            }
 
-            return null;
-          })}
-        </div>
-      </main>
+                          {/* Semântica e Impacto Prático do Termo Mais Complexo */}
+                          {complexTerm && !result && (
+                            <div className="mt-4 rounded-lg border border-gold/40 bg-gold/5 p-3.5 text-xs">
+                              <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                                <div className="flex items-center gap-1.5 font-bold text-gold">
+                                  <span>📖 Vocabulário Jurídico Chave:</span>
+                                  <span className="font-mono-type bg-gold/20 px-2 py-0.5 rounded text-foreground uppercase tracking-wide">
+                                    {complexTerm.termo}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                                  {complexTerm.categoria}
+                                </span>
+                              </div>
+                              <p className="text-foreground leading-relaxed">
+                                <strong>Significado Técnico:</strong> {complexTerm.significado}
+                              </p>
+                            </div>
+                          )}
+
+                          <p className="mt-5 text-center text-xs text-muted-foreground">
+                            {focused
+                              ? prefs.errorMode === "strict"
+                                ? "Modo estrito: o cursor trava na letra errada até você acertar."
+                                : prefs.errorMode === "restart"
+                                  ? "⚡ Morte Súbita: errou qualquer caractere, a linha reinicia do início. Treino para digitadores de elite!"
+                                  : prefs.errorMode === "nobackspace"
+                                    ? "🥋 Modo Mestre: digite sem parar para frente. Backspace desativado para treinar cadência constante."
+                                    : "Modo fluido: continue digitando e use Backspace para retornar e corrigir as letras em vermelho."
+                              : "🎯 A velocidade surge da precisão. Clique ou toque aqui para começar."}
+                          </p>
+                          <input
+                            ref={inputRef}
+                            aria-label="Área de digitação"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            autoComplete="off"
+                            spellCheck={false}
+                            enterKeyHint="next"
+                            className="absolute inset-0 h-full w-full cursor-text opacity-0"
+                            onFocus={() => setFocused(true)}
+                            onBlur={() => setFocused(false)}
+                            onCompositionEnd={(ev) => {
+                              composing.current = false;
+                              handleInput(ev.currentTarget, true);
+                            }}
+                            onInput={(ev) => handleInput(ev.currentTarget, false)}
+                          />
+                        </>
+                      )}
+                    </section>
+
+                    {/* Controles rápidos logo abaixo da digitação */}
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-3 border-t border-border/40 pt-3">
+                      <button
+                        onClick={() => setRepeat((r) => !r)}
+                        aria-pressed={repeat}
+                        title="Repetir a mesma frase deliberadamente"
+                        className={cn(
+                          "rounded-full border px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors",
+                          repeat
+                            ? "border-gold bg-gold text-gold-foreground"
+                            : "border-border bg-card text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        🔁 Repetir frase {repeat ? "ligado" : "desligado"}
+                      </button>
+                      {!result && e.text && (
+                        <button
+                          onClick={handleRestartLine}
+                          className="rounded-full border border-border bg-card px-4 py-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
+                        >
+                          ↺ Recomeçar esta
+                        </button>
+                      )}
+                    </div>
+                  </MovableCard>
+                );
+              }
+
+              if (boxId === "lesson") {
+                const activeLesson = pinned || currentStudy;
+                return (
+                  <MovableCard
+                    key="lesson"
+                    id="lesson"
+                    title="Aula & Virada de Chave"
+                    icon="🎓"
+                    canMoveUp={boxOrder.indexOf("lesson") > 0}
+                    canMoveDown={boxOrder.indexOf("lesson") < boxOrder.length - 1}
+                    onMoveUp={() => moveBox("lesson", "up")}
+                    onMoveDown={() => moveBox("lesson", "down")}
+                  >
+                    {result && activeLesson ? (
+                      <LessonCard
+                        item={activeLesson}
+                        onClose={() => {
+                          setPinned(null);
+                          setCurrentStudy(null);
+                        }}
+                        fontStudy={fontStudy}
+                        onFontChange={(f) => {
+                          setFontStudy(f);
+                          localStorage.setItem("lextype-font-study", f);
+                        }}
+                      />
+                    ) : activeLesson ? (
+                      <div className="rounded-lg border border-gold/30 bg-gold/5 p-6 text-center space-y-2">
+                        <div className="text-3xl">🔒</div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-gold">
+                          Virada de Chave Protegida
+                        </div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {mode === "leiseca" && currentLeiSeca
+                            ? `${currentLeiSeca.dispositivo} (${currentLeiSeca.diploma})`
+                            : activeLesson.virada.titulo}
+                        </p>
+                        <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                          {mode === "leiseca"
+                            ? "Foque na digitação do dispositivo legal acima. O conceito doutrinário, a tese vinculante e o caso concreto serão revelados ao final!"
+                            : "Foque na cadência e na precisão dos dedos. A Virada de Chave (critério decisivo, requisitos e caso prático) será revelada assim que você concluir a digitação!"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-border/70 p-6 text-center text-muted-foreground">
+                        <p className="text-sm font-medium mb-1">
+                          🎓 Nenhuma virada de chave carregada no momento.
+                        </p>
+                        <p className="text-xs mb-3 text-muted-foreground/80">
+                          No modo <strong>Estudos Jurídicos</strong> ou <strong>Lei Seca</strong>,
+                          este painel exibirá o conceito estruturado, critério decisivo e o caso
+                          prático correspondente ao final de cada item.
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              changeMode("estudos");
+                              void nextStudy([], selectedKeys, effectiveArea);
+                            }}
+                            className="rounded-md bg-gold px-3.5 py-1.5 text-xs font-semibold text-gold-foreground hover:opacity-90"
+                          >
+                            Iniciar Estudos Jurídicos
+                          </button>
+                          <button
+                            onClick={() => {
+                              changeMode("leiseca");
+                            }}
+                            className="rounded-md border border-gold text-gold hover:bg-gold/10 px-3.5 py-1.5 text-xs font-semibold"
+                          >
+                            Treinar Lei Seca
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </MovableCard>
+                );
+              }
+
+              if (boxId === "keyboard") {
+                return (
+                  <MovableCard
+                    key="keyboard"
+                    id="keyboard"
+                    title={`Teclado Virtual (${keyboardLayout.toUpperCase()})`}
+                    icon="⌨️"
+                    canMoveUp={boxOrder.indexOf("keyboard") > 0}
+                    canMoveDown={boxOrder.indexOf("keyboard") < boxOrder.length - 1}
+                    onMoveUp={() => moveBox("keyboard", "up")}
+                    onMoveDown={() => moveBox("keyboard", "down")}
+                  >
+                    <Keyboard
+                      nextKeys={nextKeys}
+                      stats={keyStats}
+                      selectedKeys={[]}
+                      flash={flash}
+                      layout={keyboardLayout}
+                      scale={uiScale}
+                      mode={keyboardMode}
+                    />
+                    <div className="mt-4 flex flex-wrap justify-center gap-5 text-xs text-muted-foreground">
+                      {keyboardMode === "heatmap" ? (
+                        <>
+                          <Legend cls="bg-success/40" label="dominada" />
+                          <Legend cls="bg-gold/30" label="em progresso" />
+                          <Legend cls="bg-destructive/40" label="precisa de treino" />
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Zonas coloridas por dedo. A tecla atual acende com brilho vibrante.
+                        </span>
+                      )}
+                    </div>
+                  </MovableCard>
+                );
+              }
+
+              if (boxId === "keys") {
+                return (
+                  <MovableCard
+                    key="keys"
+                    id="keys"
+                    title={
+                      mode === "automatico"
+                        ? "Diagnóstico de Teclas Críticas"
+                        : "Teclas-Alvo do Treino"
+                    }
+                    icon="🎯"
+                    canMoveUp={boxOrder.indexOf("keys") > 0}
+                    canMoveDown={boxOrder.indexOf("keys") < boxOrder.length - 1}
+                    onMoveUp={() => moveBox("keys", "up")}
+                    onMoveDown={() => moveBox("keys", "down")}
+                  >
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                        {mode === "automatico"
+                          ? "Marque as teclas em que você tem mais dificuldade"
+                          : "Teclas selecionadas para repetição"}
+                      </h2>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(KEY_GROUPS).map(([name, g]) => (
+                          <button
+                            key={name}
+                            onClick={() => toggleGroup(g)}
+                            className={cn(
+                              "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
+                              (g as readonly string[]).every((k: string) =>
+                                selectedKeys.includes(k),
+                              )
+                                ? "border-gold bg-gold/15 text-gold"
+                                : "border-border bg-secondary text-secondary-foreground hover:text-gold",
+                            )}
+                          >
+                            {name}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => applyKeys(TRAINABLE_KEYS)}
+                          className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-gold"
+                        >
+                          Todas
+                        </button>
+                        <button
+                          onClick={() => applyKeys([])}
+                          className="rounded-md border border-border bg-secondary px-3 py-1 text-xs font-medium hover:text-destructive"
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                    </div>
+                    <Keyboard
+                      stats={keyStats}
+                      selectedKeys={selectedKeys}
+                      onToggle={toggleKey}
+                      layout={keyboardLayout}
+                      compact
+                    />
+                  </MovableCard>
+                );
+              }
+
+              return null;
+            })}
+          </div>
+        </main>
       )}
+
+      {/* Modal de Múltiplos Perfis de Usuário */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onProfileSwitched={(p) => {
+          setActiveProfile(p);
+          setXp(p.xp);
+          setLevel(p.level);
+          setBestWpm(p.bestWpm);
+          setKeyStats(p.keyStats);
+          setStreak(p.streak);
+          reset(mode, selectedKeys, p.keyStats, p.level);
+        }}
+      />
     </div>
   );
 }

@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 import { RANK_TIERS, rankOf } from "@/lib/professor";
 import { loadSessions, type KeyStats } from "@/lib/typing";
+import { getLeaderboardProfiles } from "@/lib/profiles";
 import { cn } from "@/lib/utils";
 
 interface RankingRecordsPanelProps {
-  stats?: KeyStats;
-  xp?: number;
-  bestWpm?: number;
-  streak?: number;
-  practiceTodaySeconds?: number;
-  onBackToPractice?: () => void;
-  className?: string;
+  stats?: KeyStats | undefined;
+  xp?: number | undefined;
+  bestWpm?: number | undefined;
+  streak?: number | undefined;
+  practiceTodaySeconds?: number | undefined;
+  onBackToPractice?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 interface Competitor {
@@ -21,7 +22,8 @@ interface Competitor {
   accuracy: number;
   xp: number;
   badge: string;
-  isUser?: boolean;
+  isUser?: boolean | undefined;
+  isCurrentActive?: boolean | undefined;
 }
 
 export function RankingRecordsPanel({
@@ -39,7 +41,9 @@ export function RankingRecordsPanel({
   });
   const [editingNick, setEditingNick] = useState(false);
   const [tempNick, setTempNick] = useState(userNickname);
-  const [activeLeague, setActiveLeague] = useState<"todas" | "bronze" | "prata" | "ouro" | "diamante" | "suprema">("todas");
+  const [activeLeague, setActiveLeague] = useState<
+    "todas" | "bronze" | "prata" | "ouro" | "diamante" | "suprema"
+  >("todas");
 
   const sessions = useMemo(() => loadSessions(), []);
 
@@ -48,7 +52,10 @@ export function RankingRecordsPanel({
     const peakWpmFromSessions = sessions.length ? Math.max(...sessions.map((s) => s.wpm || 0)) : 0;
     const peakWpm = Math.max(bestWpm, peakWpmFromSessions);
     const bestAccuracy = sessions.length ? Math.max(...sessions.map((s) => s.accuracy || 0)) : 100;
-    const totalChars = sessions.reduce((acc, s) => acc + (s.wpm ? Math.round(s.wpm * 5 * 0.75) : 80), 0);
+    const totalChars = sessions.reduce(
+      (acc, s) => acc + (s.wpm ? Math.round(s.wpm * 5 * 0.75) : 80),
+      0,
+    );
     const totalWords = Math.round(totalChars / 5);
     const totalMinutes = Math.max(
       Math.round(practiceTodaySeconds / 60),
@@ -79,9 +86,26 @@ export function RankingRecordsPanel({
     setEditingNick(false);
   };
 
-  // Tabela simulada de competidores jurídicos de referência para o modo online futuro
+  // Tabela de competidores jurídicos de referência e múltiplos perfis locais
   const leaderboard = useMemo(() => {
+    const localProfiles = getLeaderboardProfiles();
+    const formattedLocal: Competitor[] = localProfiles.map((p) => {
+      const isCurrent = p.isCurrentActive;
+      return {
+        id: p.id,
+        name: isCurrent ? `${p.name} (Você)` : p.name,
+        title: p.title,
+        wpm: isCurrent ? Math.max(p.wpm, personalRecords.peakWpm) : p.wpm,
+        accuracy: isCurrent ? personalRecords.bestAccuracy : p.accuracy,
+        xp: isCurrent ? Math.max(p.xp, xp) : p.xp,
+        badge: p.badge,
+        isUser: true,
+        isCurrentActive: isCurrent,
+      };
+    });
+
     const competitors: Competitor[] = [
+      ...formattedLocal,
       {
         id: "comp-1",
         name: "Min. Carlos M.",
@@ -117,16 +141,6 @@ export function RankingRecordsPanel({
         accuracy: 96,
         xp: 64000,
         badge: "⚖️",
-      },
-      {
-        id: "comp-user",
-        name: `${userNickname} (Você)`,
-        title: currentRank.name,
-        wpm: personalRecords.peakWpm,
-        accuracy: personalRecords.bestAccuracy,
-        xp: xp,
-        badge: currentRank.badge,
-        isUser: true,
       },
       {
         id: "comp-5",
@@ -180,15 +194,20 @@ export function RankingRecordsPanel({
       if (b.xp !== a.xp) return b.xp - a.xp;
       return b.wpm - a.wpm;
     });
-  }, [userNickname, currentRank, personalRecords.peakWpm, personalRecords.bestAccuracy, xp]);
+  }, [personalRecords.peakWpm, personalRecords.bestAccuracy, xp]);
 
   const userPosition = useMemo(() => {
-    const idx = leaderboard.findIndex((c) => c.isUser);
+    const idx = leaderboard.findIndex((c) => c.isCurrentActive || c.isUser);
     return idx >= 0 ? idx + 1 : 1;
   }, [leaderboard]);
 
   return (
-    <div className={cn("space-y-6 rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-lg", className)}>
+    <div
+      className={cn(
+        "space-y-6 rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-lg",
+        className,
+      )}
+    >
       {/* Cabeçalho */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div className="flex items-center gap-3">
@@ -200,7 +219,8 @@ export function RankingRecordsPanel({
               Recordes Pessoais & Ranking Geral
             </h2>
             <p className="text-xs text-muted-foreground">
-              Quadro de conquistas de digitação jurídica e classificação competitiva (pronto para o futuro modo online).
+              Quadro de conquistas de digitação jurídica e classificação competitiva (pronto para o
+              futuro modo online).
             </p>
           </div>
         </div>
@@ -306,7 +326,9 @@ export function RankingRecordsPanel({
           <div className="mt-1 text-2xl font-bold sm:text-3xl" title={currentRank.description}>
             {currentRank.badge}
           </div>
-          <div className="text-[0.65rem] font-semibold text-foreground truncate">{currentRank.name}</div>
+          <div className="text-[0.65rem] font-semibold text-foreground truncate">
+            {currentRank.name}
+          </div>
         </div>
       </div>
 
@@ -318,7 +340,8 @@ export function RankingRecordsPanel({
             <strong className="text-foreground">Ambiente de Ligas Jurídicas Competitivas:</strong>
             <p>
               Você ocupa a <strong className="text-gold">#{userPosition}ª posição</strong> geral com{" "}
-              <strong className="text-foreground">{xp} XP</strong>. Ao ativar o modo online, seu perfil sincronizará em tempo real com colegas de todo o país!
+              <strong className="text-foreground">{xp} XP</strong>. Ao ativar o modo online, seu
+              perfil sincronizará em tempo real com colegas de todo o país!
             </p>
           </div>
         </div>
@@ -361,18 +384,26 @@ export function RankingRecordsPanel({
                     key={comp.id}
                     className={cn(
                       "transition-colors",
-                      comp.isUser
-                        ? "bg-gold/15 font-semibold text-foreground hover:bg-gold/20"
-                        : "hover:bg-muted/30 text-muted-foreground",
+                      comp.isCurrentActive
+                        ? "bg-gold/20 font-bold text-foreground border-l-4 border-l-gold shadow-sm"
+                        : comp.isUser
+                          ? "bg-gold/5 font-semibold text-foreground hover:bg-gold/10"
+                          : "hover:bg-muted/30 text-muted-foreground",
                     )}
                   >
                     <td className="py-3 px-4 text-center">
                       {pos === 1 ? (
-                        <span className="text-base" title="1º Lugar">🥇</span>
+                        <span className="text-base" title="1º Lugar">
+                          🥇
+                        </span>
                       ) : pos === 2 ? (
-                        <span className="text-base" title="2º Lugar">🥈</span>
+                        <span className="text-base" title="2º Lugar">
+                          🥈
+                        </span>
                       ) : pos === 3 ? (
-                        <span className="text-base" title="3º Lugar">🥉</span>
+                        <span className="text-base" title="3º Lugar">
+                          🥉
+                        </span>
                       ) : (
                         <span className="font-mono-type font-medium">#{pos}</span>
                       )}
@@ -381,15 +412,31 @@ export function RankingRecordsPanel({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{comp.badge}</span>
-                        <span className={cn(comp.isUser ? "text-gold font-bold" : "text-foreground font-medium")}>
+                        <span
+                          className={cn(
+                            comp.isCurrentActive
+                              ? "text-gold font-bold"
+                              : comp.isUser
+                                ? "text-foreground font-semibold"
+                                : "text-foreground font-medium",
+                          )}
+                        >
                           {comp.name}
                         </span>
+                        {comp.isCurrentActive && (
+                          <span className="rounded bg-gold/25 px-1.5 py-0.5 text-[10px] font-bold text-gold">
+                            Ativo
+                          </span>
+                        )}
+                        {comp.isUser && !comp.isCurrentActive && (
+                          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            Perfil Local
+                          </span>
+                        )}
                       </div>
                     </td>
 
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {comp.title}
-                    </td>
+                    <td className="py-3 px-4 text-muted-foreground">{comp.title}</td>
 
                     <td className="py-3 px-4 text-center font-mono-type font-semibold text-foreground">
                       {comp.wpm}
