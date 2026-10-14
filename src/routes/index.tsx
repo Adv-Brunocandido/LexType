@@ -1550,6 +1550,52 @@ function Index() {
             ))}
           </div>
 
+          {/* Seletor Rápido de Tolerância e Rigor (Fluido / Estrito / Morte Súbita / Modo Mestre) */}
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card/60 p-2.5 sm:px-4 sm:py-2.5 backdrop-blur-sm transition-opacity duration-500 shadow-sm",
+              inFlow && "opacity-25 hover:opacity-100",
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                🎯 Tolerância a Erros:
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              {(
+                [
+                  { id: "fluid", label: "🌊 Fluido", desc: "Corrige com Backspace livremente" },
+                  { id: "strict", label: "🛑 Estrito", desc: "Cursor trava no erro até acertar" },
+                  {
+                    id: "restart",
+                    label: "⚡ Morte Súbita",
+                    desc: "Qualquer erro reinicia a linha do zero imediatamente",
+                  },
+                  {
+                    id: "nobackspace",
+                    label: "🥋 Modo Mestre",
+                    desc: "Digitação contínua sem Backspace para treinar ritmo",
+                  },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => updatePrefs({ errorMode: m.id })}
+                  title={m.desc}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all duration-200",
+                    prefs.errorMode === m.id
+                      ? "border-gold bg-gold text-gold-foreground shadow-sm scale-102"
+                      : "border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  )}
+                >
+                  <span>{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Professor */}
           <div className="flex items-start gap-3">
             <div
