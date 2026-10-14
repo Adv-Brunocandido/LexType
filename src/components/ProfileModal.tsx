@@ -9,6 +9,7 @@ import {
   switchProfile,
   type UserProfile,
 } from "@/lib/profiles";
+import { downloadBackupFile, restoreBackupData } from "@/lib/backup";
 import { cn } from "@/lib/utils";
 
 interface ProfileModalProps {
@@ -463,6 +464,55 @@ export function ProfileModal({ isOpen, onClose, onProfileSwitched }: ProfileModa
               </div>
             </div>
 
+            {/* Seção de Backup e Restauração de Dados */}
+            <div className="rounded-lg border border-border/70 bg-secondary/30 p-3 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-foreground flex items-center gap-1.5">
+                  💾 Backup & Restauração (.json)
+                </span>
+                <span className="text-[10px] text-muted-foreground">Todos os perfis e históricos</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fn = downloadBackupFile();
+                    setErrorMsg(`Backup exportado: ${fn}`);
+                  }}
+                  className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-secondary transition shadow-sm"
+                >
+                  📥 Exportar Backup (.json)
+                </button>
+                <label className="cursor-pointer rounded-md border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-secondary transition shadow-sm">
+                  📤 Restaurar Backup (.json)
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(ev) => {
+                      const file = ev.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (e) => {
+                        const content = e.target?.result as string;
+                        if (!content) return;
+                        const res = restoreBackupData(content);
+                        if (res.success) {
+                          refreshList();
+                          onProfileSwitched(getActiveProfile());
+                          setErrorMsg(res.message);
+                        } else {
+                          setErrorMsg(res.message);
+                        }
+                      };
+                      reader.readAsText(file);
+                      ev.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
             {/* Ações Inferiores */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
               <button
@@ -499,6 +549,7 @@ export function ProfileModal({ isOpen, onClose, onProfileSwitched }: ProfileModa
                 <span>➕ Criar Novo Perfil</span>
               </button>
             </div>
+
           </div>
         )}
       </div>

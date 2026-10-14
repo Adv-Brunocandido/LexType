@@ -1,0 +1,148 @@
+import type { OfflineBankEntry } from "./study-offline";
+
+export const LATIM_FORENSE_BANK: OfflineBankEntry[] = [
+  {
+    area: "latim forense",
+    linha: "pacta sunt servanda e a forca vinculante dos contratos validamente celebrados",
+    termo: "pacta sunt servanda",
+    semantica: "Brocardo Latino Clássico — Princípio da Força Obrigatória dos Contratos",
+    virada: {
+      titulo: "1. Pacta Sunt Servanda (Obrigação Contratual)",
+      conceito: "Postulado fundamental do Direito Civil que estabelece que as convenções legalmente pactuadas constituem lei formal e material entre os contratantes, submetendo-os ao seu fiel cumprimento.",
+      raciocinio: "A revisão ou resolução contratual por onerosidade excessiva é medida estritamente excepcional, exigindo a ocorrência de evento imprevisível e extraordinário (art. 478 do Código Civil).",
+      exemplo: "O comprador tentou rescindir o contrato imobiliário alegando inflação ordinária de mercado. O juiz manteve as cláusulas pactuadas com fulcro no brocardo pacta sunt servanda.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "in dubio pro reo impoe a absolvicao do acusado diante de duvida razoavel",
+    termo: "in dubio pro reo",
+    semantica: "Brocardo Latino — Princípio do Favor Rei e Presunção de Inocência",
+    virada: {
+      titulo: "2. In Dubio Pro Reo (Presunção de Inocência)",
+      conceito: "Garantia processual penal segundo a qual a dúvida jurídica razoável quanto à autoria ou à materialidade do fato típico deve favorecer invariavelmente o réu.",
+      raciocinio: "O ônus integral da prova acusatória cabe ao Ministério Público. Não havendo provas conclusivas e estreme de dúvidas, a sentença condenatória é nula por violação ao favor rei.",
+      exemplo: "Diante de depoimentos contraditórios das testemunhas de acusação, o magistrado absolveu o réu com fulcro no art. 386, VII, do CPP e no postulado in dubio pro reo.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "fumus boni iuris e a demonstracao da plausibilidade do direito alegado",
+    termo: "fumus boni iuris",
+    semantica: "Brocardo Processual — Fumaça do Bom Direito em Tutelas de Urgência",
+    virada: {
+      titulo: "3. Fumus Boni Iuris (Aparência do Bom Direito)",
+      conceito: "Requisito indispensável para a concessão de tutelas provisórias, consistente na plausibilidade jurídica evidente das alegações fáticas e de direito formuladas pela parte requerente.",
+      raciocinio: "Diferencia-se da certeza exauriente de mérito: o magistrado realiza juízo sumário de probabilidade para salvaguardar o direito antes que o tempo processe o dano.",
+      exemplo: "Ao demonstrar a juntada de contrato original inadimplido, o credor obteve arresto cautelar mediante comprovação inequívoca do fumus boni iuris.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "periculum in mora traduz o risco concreto de dano irreparavel pelo decurso do tempo",
+    termo: "periculum in mora",
+    semantica: "Brocardo Processual — Perigo da Demora na Prestação Jurisdicional",
+    virada: {
+      titulo: "4. Periculum In Mora (Perigo na Demora)",
+      conceito: "Risco concreto de perecimento, ineficácia ou lesão irreparável ao bem da vida litigioso caso a tutela judicial não seja antecipada imediatamente.",
+      raciocinio: "A simples alegação subjetiva de receio é inócua; a parte deve demonstrar elementos concretos de urgência que justifiquem a imediata intervenção do juízo.",
+      exemplo: "O paciente portador de cardiopatia grave comprovou a urgência cirúrgica sob risco iminente de óbito, preenchendo o periculum in mora para concessão de liminar.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "non bis in idem veda a dupla condenacao ou persecucao pelo mesmo fato",
+    termo: "non bis in idem",
+    semantica: "Brocardo Penal e Constitucional — Vedação à Dupla Punição Estatal",
+    virada: {
+      titulo: "5. Non Bis In Idem (Vedação à Dupla Persecução)",
+      conceito: "Princípio informador do Estado de Direito que proíbe que qualquer indivíduo seja processado, julgado ou apenado duplamente pelo mesmo fato delituoso histórico.",
+      raciocinio: "Incide tanto no âmbito penal formal quanto na cumulação de sanções de natureza punitiva (como em improbidade e penalidades administrativas com identidade material).",
+      exemplo: "O tribunal trancou a segunda denúncia criminal oferecida contra o réu após demonstrada a identidade material com ação penal transitada em julgado anterior.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "inaudita altera parte permite a concessao de liminar sem oitiva previa do reu",
+    termo: "inaudita altera parte",
+    semantica: "Brocardo Processual — Tutela Urgente sem Contraditório Prévio",
+    virada: {
+      titulo: "6. Inaudita Altera Parte (Medida sem Prévia Intimação)",
+      conceito: "Deferimento de medida judicial de urgência antes da cientificação ou manifestação do polo passivo, justificado pela probabilidade de que a intimação prévia torne inócua a decisão.",
+      raciocinio: "O contraditório não é suprimido, mas apenas postergado para momento posterior (contraditório diferido), conciliando ampla defesa com a efetividade tutelar.",
+      exemplo: "O juiz determinou o bloqueio eletrônico de valores inaudita altera parte diante do fundado receio de dilapidação patrimonial iminente pelo executado.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "iura novit curia consagra o dever do juiz de conhecer e aplicar o direito cabivel",
+    termo: "iura novit curia",
+    semantica: "Brocardo Processual — O Juiz Conhece o Direito",
+    virada: {
+      titulo: "7. Iura Novit Curia (O Tribunal Conhece as Leis)",
+      conceito: "Postulado que confere ao magistrado a prerrogativa e o dever de qualificar juridicamente os fatos narrados na petição inicial e aplicar a norma incidente, mesmo que não indicada pelo autor.",
+      raciocinio: "O autor define a causa de pedir remota (os fatos) e o pedido; o magistrado aplica o enquadramento dogmático adequado, desde que respeite a adstrição ao pedido formulado.",
+      exemplo: "Embora a inicial tenha invocado norma revogada, o juiz aplicou o artigo legal vigente com esteio no postulado iura novit curia.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "venire contra factum proprium proibe comportamentos contraditorios e desleais",
+    termo: "venire contra factum proprium",
+    semantica: "Brocardo Latino — Tutela da Boa-Fé Objetiva e Proibição de Contradição",
+    virada: {
+      titulo: "8. Venire Contra Factum Proprium (Vedação à Conduta Contraditória)",
+      conceito: "Figura parcelar da boa-fé objetiva que impede o exercício de uma posição jurídica que entre em direta contradição com um comportamento antecedente legítimo que gerou justa expectativa.",
+      raciocinio: "Exige a presença de factum proprium (conduta inicial), justa confiança despertada no terceiro, comportamento posterior contraditório e dano potencial à contraparte.",
+      exemplo: "O credor que tolerou pagamento por depósito durante 2 anos não pode executar o contrato subitamente por falta de pagamento via boleto bancário.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "nemo tenetur se detegere assegura que ninguem e obrigado a se autoincriminar",
+    termo: "nemo tenetur se detegere",
+    semantica: "Brocardo Constitucional — Privilégio contra a Autoincriminação",
+    virada: {
+      titulo: "9. Nemo Tenetur Se Detegere (Não Autoincriminação)",
+      conceito: "Garantia constitucional e convencional que protege o investigado ou acusado de fornecer involuntariamente elementos probatórios aptos a incriminá-lo perante o Estado.",
+      raciocinio: "Desdobra-se no direito ao silêncio durante o interrogatório, no direito de não produzir prova invasiva ao próprio corpo e na ausência de presunção de culpa pela recusa.",
+      exemplo: "O motorista recusou-se a realizar o teste do bafômetro sob o amparo do princípio nemo tenetur se detegere, não podendo sofrer persecução penal exclusivamente pela recusa.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "ex tunc retroage os efeitos da decisao a data de nascimento do ato nulo",
+    termo: "ex tunc",
+    semantica: "Brocardo Jurídico — Efeitos Retroativos da Declaração de Nulidade",
+    virada: {
+      titulo: "10. Ex Tunc (Efeitos Retroativos)",
+      conceito: "Eficácia jurídica de uma decisão ou ato que retroage no tempo até a gênese originária da situação jurídica, desconstituindo integralmente os efeitos passados gerados pelo ato nulo.",
+      raciocinio: "A declaração de inconstitucionalidade em controle concentrado de normas opera por regra geral com eficácia ex tunc, ressalvada a modulação temporal de efeitos.",
+      exemplo: "O ato administrativo viciado por desvio de finalidade foi anulado pelo Poder Judiciário com efeitos ex tunc, restaurando o status quo ante.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "ex nunc projeta os efeitos da decisao exclusivamente para o futuro",
+    termo: "ex nunc",
+    semantica: "Brocardo Jurídico — Efeitos Prospectivos sem Retroação",
+    virada: {
+      titulo: "11. Ex Nunc (Efeitos Prospectivos)",
+      conceito: "Eficácia temporal de pronunciamento judicial ou normativo que produz efeitos exclusivamente a partir de sua publicação ou trânsito em julgado, preservando os efeitos pretéritos consolidados.",
+      raciocinio: "Empregado na revogação de atos válidos e nas decisões do STF quando há modulação de efeitos por razões de segurança jurídica ou excepcional interesse social.",
+      exemplo: "A lei tributária declarada inconstitucional teve seus efeitos modulados ex nunc para evitar descompasso orçamentário abrupto no erário público.",
+    },
+  },
+  {
+    area: "latim forense",
+    linha: "res judicata confere imutabilidade e indiscutibilidade a sentenca definitiva de merito",
+    termo: "res judicata",
+    semantica: "Brocardo Processual — Autoridade da Coisa Julgada Material",
+    virada: {
+      titulo: "12. Res Judicata (A Coisa Julgada)",
+      conceito: "Qualidade conferida à sentença de mérito transitada em julgado que a torna imutável e indiscutível, obstando a repropositura da mesma demanda sob pretexto idêntico.",
+      raciocinio: "Garantia pétrea prevista no art. 5º, XXXVI, da CF/88, fundamental para a estabilidade das relações sociais e para a pacificação definitiva dos litígios.",
+      exemplo: "A empresa ré extinguiu nova ação de indenização demonstrando preliminar de res judicata, diante de acórdão proferido em idêntica contenda em 2021.",
+    },
+  },
+];

@@ -94,6 +94,20 @@ export function Keyboard({
 
   return (
     <div className="overflow-x-auto pb-1">
+      <div className="flex items-center justify-end mb-1 px-1">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.open("/keyboard", "_blank", "width=1150,height=600");
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground hover:text-gold transition-colors py-0.5 px-2 rounded border border-border/60 hover:border-gold/50 bg-card/60 shadow-xs"
+          title="Abrir Teclado ABNT2 em uma janela independente ou monitor secundário"
+        >
+          <span>↗ Teclado Externo (2ª Tela)</span>
+        </button>
+      </div>
       <div className={cn("mx-auto flex w-max flex-col gap-1 select-none", scaleClass)}>
         {rows.map((row: KeyDef[], i: number) => (
           <div key={i} className={cn("flex gap-1", i === 4 && "justify-center")}>

@@ -1,13 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  LEI_SECA_BANK,
   LEI_SECA_EIXOS,
-  checkAndSyncOfficialLegislation,
-  filterLeiSeca,
-  getDiplomasList,
   type LeiSecaEixo,
   type LeiSecaItem,
-} from "@/lib/lei-seca";
+} from "@/lib/lei-seca-types";
+import { getLeiSecaModule } from "@/lib/lazy-modules";
 import { cn } from "@/lib/utils";
 
 interface LeiSecaPanelProps {
@@ -17,6 +14,7 @@ interface LeiSecaPanelProps {
 }
 
 export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaPanelProps) {
+  const [mod, setMod] = useState<typeof import("@/lib/lei-seca") | null>(null);
   const [selectedEixo, setSelectedEixo] = useState<LeiSecaEixo>("Todos os Eixos");
   const [selectedDiploma, setSelectedDiploma] = useState<string>("Todos os Diplomas");
   const [searchTerm, setSearchTerm] = useState("");
@@ -28,25 +26,34 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
     return last ? `Última sincronização com portais oficiais: ${last}` : null;
   });
 
+  useEffect(() => {
+    void getLeiSecaModule().then(setMod);
+  }, []);
+
   // Reseta paginação quando o usuário altera filtros de busca
   useEffect(() => {
     setVisibleCount(40);
   }, [selectedEixo, selectedDiploma, searchTerm]);
 
-  const availableDiplomas = useMemo(() => getDiplomasList(), []);
+  const availableDiplomas = useMemo(
+    () => (mod ? mod.getDiplomasList() : ["Todos os Diplomas"]),
+    [mod],
+  );
 
   const filteredItems = useMemo(() => {
-    return filterLeiSeca(selectedEixo, searchTerm, selectedDiploma);
-  }, [selectedEixo, searchTerm, selectedDiploma]);
+    if (!mod) return [];
+    return mod.filterLeiSeca(selectedEixo, searchTerm, selectedDiploma);
+  }, [mod, selectedEixo, searchTerm, selectedDiploma]);
 
   const visibleItems = useMemo(() => {
     return filteredItems.slice(0, visibleCount);
   }, [filteredItems, visibleCount]);
 
   const handleSync = async () => {
+    if (!mod) return;
     setSyncing(true);
     try {
-      const res = await checkAndSyncOfficialLegislation();
+      const res = await mod.checkAndSyncOfficialLegislation();
       setSyncMessage(res.message);
     } catch {
       setSyncMessage("Banco offline carregado com sucesso.");
@@ -55,8 +62,37 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
     }
   };
 
+  if (!mod) {
+    return (
+      <div
+        className={cn(
+          "space-y-6 rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-lg animate-pulse",
+          className,
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gold/20" />
+          <div className="space-y-2">
+            <div className="h-5 w-48 bg-gold/20 rounded" />
+            <div className="h-3 w-80 bg-gold/10 rounded" />
+          </div>
+        </div>
+        <div className="h-10 w-full bg-secondary/30 rounded-lg" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="h-44 rounded-xl bg-secondary/20 border border-border/40" />
+          <div className="h-44 rounded-xl bg-secondary/20 border border-border/40" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn("space-y-6 rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-lg", className)}>
+    <div
+      className={cn(
+        "space-y-6 rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-lg",
+        className,
+      )}
+    >
       {/* Cabeçalho do Painel */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div className="flex items-center gap-3">
@@ -68,7 +104,8 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
               Lei Seca Oficial
             </h2>
             <p className="text-xs text-muted-foreground">
-              Artigos, incisos, parágrafos e súmulas vinculantes organizados por eixo temático para memorização e digitação por toque.
+              Artigos, incisos, parágrafos e súmulas vinculantes organizados por eixo temático para
+              memorização e digitação por toque.
             </p>
           </div>
         </div>
@@ -158,10 +195,13 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
       {/* Contagem de Dispositivos */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>
-          Exibindo <strong>{visibleItems.length}</strong> de <strong>{filteredItems.length}</strong> dispositivo(s) normativo(s)
+          Exibindo <strong>{visibleItems.length}</strong> de{" "}
+          <strong>{filteredItems.length}</strong> dispositivo(s) normativo(s)
           {selectedDiploma !== "Todos os Diplomas" && ` em ${selectedDiploma}`}
         </span>
-        <span className="italic">Clique em "⌨️ Digitar Artigo" para praticar no motor de digitação</span>
+        <span className="italic">
+          Clique em "⌨️ Digitar Artigo" para praticar no motor de digitação
+        </span>
       </div>
 
       {filteredItems.length === 0 && (
@@ -198,44 +238,31 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
                     <span className="rounded bg-gold/15 px-2 py-0.5 text-[11px] font-bold text-gold uppercase tracking-wider">
                       {item.dispositivo}
                     </span>
-                    <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {item.diploma}
-                    </span>
+                    <span className="text-xs font-semibold text-foreground">{item.diploma}</span>
                   </div>
-                  <span className="mt-1 block text-[10px] text-muted-foreground">
-                    Eixo: {item.eixo} • Fonte: {item.fonteOficial}
+                  <span className="mt-1 inline-block text-[11px] text-muted-foreground">
+                    ⚖️ {item.eixo}
                   </span>
                 </div>
-
                 <button
                   onClick={() => onSelectForTyping(item)}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold shadow-sm transition hover:scale-105 hover:bg-gold hover:text-gold-foreground"
-                  title="Carregar o texto exato deste artigo na área de digitação"
+                  className="rounded-lg bg-gold px-3 py-1.5 text-xs font-bold text-gold-foreground transition hover:opacity-90 active:scale-95 shadow-sm"
+                  title="Carregar este dispositivo legal na área de digitação"
                 >
-                  <span>⌨️</span> Digitar Artigo
+                  ⌨️ Digitar Artigo
                 </button>
               </div>
 
-              {/* Texto Oficial da Lei Seca */}
-              <div className="mt-3">
-                <p className="font-mono-type text-xs sm:text-sm leading-relaxed text-foreground select-text bg-card/60 rounded-lg p-3 border border-border/40">
-                  {item.texto}
-                </p>
-              </div>
+              {/* Texto do Dispositivo */}
+              <p className="mt-3 text-xs leading-relaxed text-foreground sm:text-sm font-serif italic">
+                "{item.texto}"
+              </p>
 
-              {/* Explicação Prática & Contexto em Provas */}
-              <div className="mt-3 text-xs text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">⚖️ Incidência & Prática: </strong>
+              {/* Explicação Didática / Tese Vinculante */}
+              <div className="mt-3 rounded-lg bg-secondary/40 p-2.5 text-xs text-muted-foreground">
+                <strong className="text-foreground">💡 Razão Decisória / Síntese: </strong>
                 {item.explicacao}
               </div>
-
-              {/* Caso Concreto Autêntico (apenas quando fornecido) */}
-              {item.casoConcreto && item.casoConcreto.trim() && (
-                <div className="mt-2.5 rounded-lg bg-gold/10 p-2.5 border border-gold/30 text-xs">
-                  <strong className="text-gold">⚖️ Exemplo no Caso Concreto: </strong>
-                  <span className="text-foreground">{item.casoConcreto}</span>
-                </div>
-              )}
 
               {/* Semântica dos Termos Complexos */}
               {item.palavrasComplexas && item.palavrasComplexas.length > 0 && (
@@ -243,8 +270,11 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gold">
                     📖 Semântica dos Termos Complexos:
                   </span>
-                  {item.palavrasComplexas.map((tc) => (
-                    <div key={tc.termo} className="rounded bg-gold/5 px-2 py-1 text-[11px] text-foreground">
+                  {item.palavrasComplexas.map((tc: { termo: string; semantica: string }) => (
+                    <div
+                      key={tc.termo}
+                      className="rounded bg-gold/5 px-2 py-1 text-[11px] text-foreground"
+                    >
                       <strong className="text-gold capitalize">{tc.termo}: </strong>
                       <span className="text-muted-foreground">{tc.semantica}</span>
                     </div>
@@ -256,20 +286,14 @@ export function LeiSecaPanel({ onSelectForTyping, onClose, className }: LeiSecaP
         ))}
       </div>
 
-      {/* Paginação / Carregamento progressivo para fluidez 60 FPS */}
-      {filteredItems.length > visibleCount && (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4 border-t border-border/60">
+      {/* Botão Carregar Mais */}
+      {visibleItems.length < filteredItems.length && (
+        <div className="flex justify-center pt-2">
           <button
-            onClick={() => setVisibleCount((prev) => Math.min(prev + 40, filteredItems.length))}
-            className="inline-flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-5 py-2.5 text-xs font-semibold text-gold transition hover:bg-gold/20 shadow-sm active:scale-95"
+            onClick={() => setVisibleCount((prev) => prev + 40)}
+            className="rounded-lg border border-border bg-secondary/50 px-6 py-2 text-xs font-semibold text-foreground hover:bg-secondary transition"
           >
-            <span>📜</span> Exibir mais 40 dispositivos (+40) — Restam {filteredItems.length - visibleCount}
-          </button>
-          <button
-            onClick={() => setVisibleCount(filteredItems.length)}
-            className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition hover:border-gold/30"
-          >
-            Carregar todos ({filteredItems.length} dispositivos)
+            Carregar mais dispositivos (+40)
           </button>
         </div>
       )}

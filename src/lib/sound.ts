@@ -79,9 +79,14 @@ function ac(): AudioContext | null {
     const C =
       window.AudioContext ??
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    ctx = new C();
+    if (typeof C !== "function") return null;
+    try {
+      ctx = new C();
+    } catch {
+      return null;
+    }
   }
-  if (ctx.state === "suspended") void ctx.resume();
+  if (ctx && ctx.state === "suspended") void ctx.resume();
   return ctx;
 }
 
@@ -208,3 +213,64 @@ export function playWin() {
   [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.1, 0.25, "triangle", 0.16));
   [523.25, 659.25, 783.99].forEach((f) => tone(f, 0.45, 0.7, "sine", 0.08));
 }
+
+// Metrônomo Rítmico de Cadência (Web Audio)
+export type MetronomeBpm = "off" | 60 | 80 | 100;
+
+let metronomeTimer: ReturnType<typeof setInterval> | null = null;
+let currentMetronomeBpm: MetronomeBpm = (() => {
+  if (typeof localStorage === "undefined") return "off";
+  try {
+    const s = localStorage.getItem("lextype-metronome");
+    if (s === "60" || s === "80" || s === "100") return Number(s) as MetronomeBpm;
+  } catch {}
+  return "off";
+})();
+
+export function playMetronomeTick() {
+  const a = ac();
+  if (!a) return;
+  // Batida sutil de madeira acústica (woodblock)
+  tone(1200, 0, 0.02, "sine", 0.07, 700);
+}
+
+export function startMetronome(bpm?: MetronomeBpm) {
+  stopMetronome();
+  if (bpm !== undefined) {
+    currentMetronomeBpm = bpm;
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("lextype-metronome", String(bpm));
+    }
+  }
+  if (currentMetronomeBpm === "off") return;
+
+  const intervalMs = Math.round((60 / currentMetronomeBpm) * 1000);
+  playMetronomeTick();
+  metronomeTimer = setInterval(() => {
+    playMetronomeTick();
+  }, intervalMs);
+}
+
+export function stopMetronome() {
+  if (metronomeTimer) {
+    clearInterval(metronomeTimer);
+    metronomeTimer = null;
+  }
+}
+
+export function setMetronome(bpm: MetronomeBpm) {
+  currentMetronomeBpm = bpm;
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("lextype-metronome", String(bpm));
+  }
+  if (bpm === "off") {
+    stopMetronome();
+  } else {
+    startMetronome(bpm);
+  }
+}
+
+export function getMetronomeBpm(): MetronomeBpm {
+  return currentMetronomeBpm;
+}
+
