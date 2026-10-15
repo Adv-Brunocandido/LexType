@@ -166,7 +166,8 @@ export function loadKeyStats(): KeyStats {
   }
 }
 export function saveKeyStats(s: KeyStats) {
-  localStorage.setItem("lextype-keystats", JSON.stringify(s));
+  if (typeof localStorage !== "undefined")
+    localStorage.setItem("lextype-keystats", JSON.stringify(s));
 }
 
 export function masteryOf(stat?: KeyStat): number {
@@ -250,7 +251,8 @@ export function loadSessions(): SessionRecord[] {
 export function saveSession(r: SessionRecord) {
   const all = loadSessions();
   all.push(r);
-  localStorage.setItem("lextype-sessions", JSON.stringify(all.slice(-200)));
+  if (typeof localStorage !== "undefined")
+    localStorage.setItem("lextype-sessions", JSON.stringify(all.slice(-200)));
 }
 
 export function toLocalDateString(d: Date | string = new Date()): string {
@@ -287,10 +289,13 @@ export function sessionsToday(): number {
 }
 
 export const loadNum = (key: string, def: number) => {
+  if (typeof localStorage === "undefined") return def;
   const v = Number(localStorage.getItem(key));
   return Number.isFinite(v) && localStorage.getItem(key) !== null ? v : def;
 };
-export const saveNum = (key: string, v: number) => localStorage.setItem(key, String(v));
+export const saveNum = (key: string, v: number) => {
+  if (typeof localStorage !== "undefined") localStorage.setItem(key, String(v));
+};
 
 // ---------------- módulos de complexidade ----------------
 

@@ -7,6 +7,7 @@ export interface LexTypeBackupPayload {
   exportedAt: string;
   data: Record<string, string>;
 }
+export type LexTypeBackupData = LexTypeBackupPayload;
 
 export function generateBackupPayload(): LexTypeBackupPayload {
   const data: Record<string, string> = {};
