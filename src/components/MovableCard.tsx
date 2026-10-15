@@ -42,6 +42,7 @@ export function MovableCard({
   });
 
   const [isMinimized, setIsMinimized] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   const handleWidthCycle = (direction: "left" | "right") => {
     if (direction === "left") {
@@ -100,8 +101,24 @@ export function MovableCard({
         marginLeft: align === "right" ? "auto" : align === "center" ? "auto" : "0",
         marginRight: align === "left" ? "auto" : align === "center" ? "auto" : "0",
       }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("application/x-lextype-box")) {
+          e.preventDefault();
+          setDragOver(true);
+        }
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        setDragOver(false);
+        const from = e.dataTransfer.getData("application/x-lextype-box");
+        if (from && from !== id) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent("lextype-box-drop", { detail: { from, to: id } }));
+        }
+      }}
       className={cn(
-        "transition-all duration-300 resize overflow-auto",
+        "transition-all duration-300",
+        dragOver && "rounded-xl ring-2 ring-gold",
         className,
       )}
     >
@@ -110,7 +127,12 @@ export function MovableCard({
         <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-2.5">
           <div className="flex items-center gap-2">
             <span
-              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-gold text-xs select-none"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("application/x-lextype-box", id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-gold text-base px-1 select-none"
               title="Alça de reposicionamento (arraste para ordenar ou use as setas)"
             >
               ⋮⋮

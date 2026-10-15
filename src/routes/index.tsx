@@ -1272,6 +1272,64 @@ function Index() {
   const liveWpm = e.startedAt && pos > 0 && elapsed > 0 ? Math.round(pos / 5 / (elapsed / 60)) : 0;
   const liveAcc = pos > 0 ? Math.round((pos / (pos + e.errors)) * 100) : 100;
   const nextKeys = !result && e.text[pos] ? charToKeys(e.text[pos]!, keyboardLayout) : [];
+  const nextKeysSig = nextKeys.join("|");
+
+  // Sincronização com o teclado da 2ª tela (substitui o teclado da plataforma)
+  const [popoutActive, setPopoutActive] = useState(false);
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const syncRef = useRef<() => void>(() => {});
+  syncRef.current = () => {
+    channelRef.current?.postMessage({
+      type: "KEYBOARD_SYNC",
+      nextKeys,
+      flash,
+      stats: keyStats,
+      layout: keyboardLayout,
+      mode: keyboardMode,
+    });
+  };
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    const ch = new BroadcastChannel("lextype-channel");
+    channelRef.current = ch;
+    ch.onmessage = (ev) => {
+      const t = ev.data?.type;
+      if (t === "REQUEST_SYNC" || t === "POPOUT_ALIVE") {
+        setPopoutActive(true);
+        if (t === "REQUEST_SYNC") syncRef.current();
+      } else if (t === "POPOUT_CLOSED") setPopoutActive(false);
+    };
+    ch.postMessage({ type: "MAIN_PING" });
+    return () => {
+      ch.close();
+      channelRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (popoutActive) syncRef.current();
+  }, [popoutActive, nextKeysSig, flash, keyStats, keyboardLayout, keyboardMode]);
+
+  useEffect(() => {
+    const h = (ev: Event) => {
+      const d = (ev as CustomEvent<{ from: string; to: string }>).detail;
+      if (d) moveBoxTo(d.from, d.to);
+    };
+    window.addEventListener("lextype-box-drop", h);
+    return () => window.removeEventListener("lextype-box-drop", h);
+  });
+  const moveBoxTo = (from: string, to: string) => {
+    if (from === to) return;
+    setBoxOrder((prev) => {
+      const next = prev.filter((b) => b !== from);
+      const idx = next.indexOf(to);
+      if (idx === -1) return prev;
+      const fromIdx = prev.indexOf(from);
+      const toIdx = prev.indexOf(to);
+      next.splice(fromIdx < toIdx ? idx + 1 : idx, 0, from);
+      localStorage.setItem("lextype-box-order", JSON.stringify(next));
+      return next;
+    });
+  };
   const weak = useMemo(() => weakestKeys(keyStats, TRAINABLE_KEYS, 3), [keyStats]);
   const rank = rankOf(xp, bestWpm, liveAcc);
   const inFlow = running && !result;
@@ -2060,6 +2118,11 @@ function Index() {
           onMoveUp={() => moveBox("keyboard", "up")}
           onMoveDown={() => moveBox("keyboard", "down")}
         >
+          {popoutActive ? (
+            <div className="rounded-lg border border-gold/40 bg-gold/5 p-4 text-center text-sm text-muted-foreground">
+              ↗ Teclado ativo na 2ª tela. Feche aquela janela para trazê-lo de volta aqui.
+            </div>
+          ) : (
           <Keyboard
             nextKeys={nextKeys}
             stats={keyStats}
@@ -2069,6 +2132,7 @@ function Index() {
             scale={uiScale}
             mode={keyboardMode}
           />
+          )}
           <div className="mt-4 flex flex-wrap justify-center gap-5 text-xs text-muted-foreground">
             {keyboardMode === "heatmap" ? (
               <>
@@ -3028,8 +3092,9 @@ function Index() {
                 {/* Mode Banners (tribunal, estudos, leiseca, automatico) */}
                 {renderModeBanners()}
 
-                {/* Área de Digitação */}
-                {renderModularBox("typing")}
+                {boxOrder
+                  .filter((b) => b === "typing" || b === "keyboard" || b === "keys")
+                  .map((b) => renderModularBox(b))}
 
                 {/* Atalhos Zen Legend */}
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card/50 px-3.5 py-2 text-xs text-muted-foreground shadow-xs">
@@ -3046,11 +3111,6 @@ function Index() {
                   </span>
                 </div>
 
-                {/* Teclado Virtual */}
-                {renderModularBox("keyboard")}
-
-                {/* Teclas Críticas */}
-                {renderModularBox("keys")}
               </div>
 
               {/* Coluna Lateral de Inteligência Forense (Direita ~35%) */}
