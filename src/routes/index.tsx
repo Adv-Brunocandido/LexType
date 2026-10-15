@@ -1272,6 +1272,56 @@ function Index() {
   const liveWpm = e.startedAt && pos > 0 && elapsed > 0 ? Math.round(pos / 5 / (elapsed / 60)) : 0;
   const liveAcc = pos > 0 ? Math.round((pos / (pos + e.errors)) * 100) : 100;
   const nextKeys = !result && e.text[pos] ? charToKeys(e.text[pos]!, keyboardLayout) : [];
+  const nextKeysSig = nextKeys.join("|");
+
+  // Sincronização com o teclado da 2ª tela (substitui o teclado da plataforma)
+  const [popoutActive, setPopoutActive] = useState(false);
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const syncRef = useRef<() => void>(() => {});
+  syncRef.current = () => {
+    channelRef.current?.postMessage({
+      type: "KEYBOARD_SYNC",
+      nextKeys,
+      flash,
+      stats: keyStats,
+      layout: keyboardLayout,
+      mode: keyboardMode,
+    });
+  };
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    const ch = new BroadcastChannel("lextype-channel");
+    channelRef.current = ch;
+    ch.onmessage = (ev) => {
+      const t = ev.data?.type;
+      if (t === "REQUEST_SYNC" || t === "POPOUT_ALIVE") {
+        setPopoutActive(true);
+        if (t === "REQUEST_SYNC") syncRef.current();
+      } else if (t === "POPOUT_CLOSED") setPopoutActive(false);
+    };
+    ch.postMessage({ type: "MAIN_PING" });
+    return () => {
+      ch.close();
+      channelRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (popoutActive) syncRef.current();
+  }, [popoutActive, nextKeysSig, flash, keyStats, keyboardLayout, keyboardMode]);
+
+  const moveBoxTo = (from: string, to: string) => {
+    if (from === to) return;
+    setBoxOrder((prev) => {
+      const next = prev.filter((b) => b !== from);
+      const idx = next.indexOf(to);
+      if (idx === -1) return prev;
+      const fromIdx = prev.indexOf(from);
+      const toIdx = prev.indexOf(to);
+      next.splice(fromIdx < toIdx ? idx + 1 : idx, 0, from);
+      localStorage.setItem("lextype-box-order", JSON.stringify(next));
+      return next;
+    });
+  };
   const weak = useMemo(() => weakestKeys(keyStats, TRAINABLE_KEYS, 3), [keyStats]);
   const rank = rankOf(xp, bestWpm, liveAcc);
   const inFlow = running && !result;
