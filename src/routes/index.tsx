@@ -1309,6 +1309,14 @@ function Index() {
     if (popoutActive) syncRef.current();
   }, [popoutActive, nextKeysSig, flash, keyStats, keyboardLayout, keyboardMode]);
 
+  useEffect(() => {
+    const h = (ev: Event) => {
+      const d = (ev as CustomEvent<{ from: string; to: string }>).detail;
+      if (d) moveBoxTo(d.from, d.to);
+    };
+    window.addEventListener("lextype-box-drop", h);
+    return () => window.removeEventListener("lextype-box-drop", h);
+  });
   const moveBoxTo = (from: string, to: string) => {
     if (from === to) return;
     setBoxOrder((prev) => {
@@ -2110,6 +2118,11 @@ function Index() {
           onMoveUp={() => moveBox("keyboard", "up")}
           onMoveDown={() => moveBox("keyboard", "down")}
         >
+          {popoutActive ? (
+            <div className="rounded-lg border border-gold/40 bg-gold/5 p-4 text-center text-sm text-muted-foreground">
+              ↗ Teclado ativo na 2ª tela. Feche aquela janela para trazê-lo de volta aqui.
+            </div>
+          ) : (
           <Keyboard
             nextKeys={nextKeys}
             stats={keyStats}
@@ -2119,6 +2132,7 @@ function Index() {
             scale={uiScale}
             mode={keyboardMode}
           />
+          )}
           <div className="mt-4 flex flex-wrap justify-center gap-5 text-xs text-muted-foreground">
             {keyboardMode === "heatmap" ? (
               <>
@@ -3078,8 +3092,9 @@ function Index() {
                 {/* Mode Banners (tribunal, estudos, leiseca, automatico) */}
                 {renderModeBanners()}
 
-                {/* Área de Digitação */}
-                {renderModularBox("typing")}
+                {boxOrder
+                  .filter((b) => b === "typing" || b === "keyboard" || b === "keys")
+                  .map((b) => renderModularBox(b))}
 
                 {/* Atalhos Zen Legend */}
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card/50 px-3.5 py-2 text-xs text-muted-foreground shadow-xs">
@@ -3096,11 +3111,6 @@ function Index() {
                   </span>
                 </div>
 
-                {/* Teclado Virtual */}
-                {renderModularBox("keyboard")}
-
-                {/* Teclas Críticas */}
-                {renderModularBox("keys")}
               </div>
 
               {/* Coluna Lateral de Inteligência Forense (Direita ~35%) */}
