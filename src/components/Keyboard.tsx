@@ -14,6 +14,7 @@ interface Props {
   scale?: KeyboardScale;
   layout?: KeyboardLayout;
   mode?: "heatmap" | "rainbow";
+  popout?: boolean;
 }
 
 function fingerClass(key: string, layout: KeyboardLayout, isNext: boolean): string {
@@ -81,6 +82,7 @@ export function Keyboard({
   scale = "normal",
   layout = "abnt2",
   mode = "heatmap",
+  popout = false,
 }: Props) {
   const scaleClass =
     scale === "compact" || compact
@@ -94,6 +96,7 @@ export function Keyboard({
 
   return (
     <div className="overflow-x-auto pb-1">
+      {!popout && !onToggle && (
       <div className="flex items-center justify-end mb-1 px-1">
         <button
           type="button"
@@ -108,6 +111,7 @@ export function Keyboard({
           <span>↗ Teclado Externo (2ª Tela)</span>
         </button>
       </div>
+      )}
       <div className={cn("mx-auto flex w-max flex-col gap-1 select-none", scaleClass)}>
         {rows.map((row: KeyDef[], i: number) => (
           <div key={i} className={cn("flex gap-1", i === 4 && "justify-center")}>

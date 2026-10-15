@@ -16,6 +16,7 @@ function KeyboardPopoutPage() {
   const [layout, setLayout] = useState<KeyboardLayout>("abnt2");
   const [scale, setScale] = useState<KeyboardScale>("large");
   const [connected, setConnected] = useState(false);
+  const [mode, setMode] = useState<"heatmap" | "rainbow">("heatmap");
 
   useEffect(() => {
     // Carregar tema salvo
@@ -41,13 +42,22 @@ function KeyboardPopoutPage() {
           if (data.stats !== undefined) setStats(data.stats);
           if (data.layout !== undefined) setLayout(data.layout);
           if (data.scale !== undefined) setScale(data.scale);
+          if (data.mode !== undefined) setMode(data.mode);
+        } else if (data?.type === "MAIN_PING") {
+          channel.postMessage({ type: "REQUEST_SYNC" });
         }
       };
 
       // Solicita sync inicial
       channel.postMessage({ type: "REQUEST_SYNC" });
 
+      const alive = setInterval(() => channel.postMessage({ type: "POPOUT_ALIVE" }), 3000);
+      const bye = () => channel.postMessage({ type: "POPOUT_CLOSED" });
+      window.addEventListener("beforeunload", bye);
       return () => {
+        clearInterval(alive);
+        window.removeEventListener("beforeunload", bye);
+        bye();
         channel.close();
       };
     }
@@ -125,6 +135,8 @@ function KeyboardPopoutPage() {
             flash={flash}
             scale={scale}
             layout={layout}
+            mode={mode}
+            popout
           />
         </div>
         <p className="mt-4 text-xs text-muted-foreground text-center">
