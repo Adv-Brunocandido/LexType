@@ -280,11 +280,15 @@ function Index() {
     return ["typing", "lesson", "keyboard", "keys"];
   });
 
+  const layoutModeRef = useRef(layoutMode);
+  layoutModeRef.current = layoutMode;
   const moveBox = (id: string, dir: "up" | "down") => {
     setBoxOrder((prev) => {
       const idx = prev.indexOf(id);
       if (idx === -1) return prev;
-      const target = dir === "up" ? idx - 1 : idx + 1;
+      const hidden = (b: string) => layoutModeRef.current !== "classic" && b === "lesson";
+      let target = dir === "up" ? idx - 1 : idx + 1;
+      while (target >= 0 && target < prev.length && hidden(prev[target]!)) target += dir === "up" ? -1 : 1;
       if (target < 0 || target >= prev.length) return prev;
       const next = [...prev];
       const item = next[idx]!;
